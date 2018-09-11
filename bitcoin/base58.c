@@ -15,9 +15,11 @@
 #include <libbase58.h>
 #include <string.h>
 
+extern void groestl_single_hash(void *, const void * , size_t len);
+
 static bool my_sha256(void *digest, const void *data, size_t datasz)
 {
-	sha256(digest, data, datasz);
+	groestl_single_hash((void *)&digest, (void *)data, datasz);
 	return true;
 }
 
