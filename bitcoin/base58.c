@@ -9,26 +9,31 @@
 #include "pubkey.h"
 #include "shadouble.h"
 #include <assert.h>
+#include <bitcoin/chainparams.h>
+#include <bitcoin/groestl.h>
 #include <ccan/build_assert/build_assert.h>
 #include <ccan/tal/str/str.h>
 #include <common/utils.h>
 #include <libbase58.h>
 #include <string.h>
 
-extern void groestlhash(void *, const void * , size_t len);
 
 static bool my_sha256(void *digest, const void *data, size_t datasz)
 {
+#ifndef COMPILE_FOR_BITCOIN
 	/* make groestl hash compatible to luke's lib */
 	static bool si = false;
-	uint32_t my_hash[16];
-
+	static uint32_t my_hash[16];
+	/* FIXME this should be tal alloc's*/
 	if (!si) {	si = true;
 			groestlhash((void *)my_hash, (void *)data, datasz);
 		} else {
 				memcpy(digest, my_hash, 32);
 				si = false;
-		}
+		};
+#else
+	sha256(digest, data, datasz);
+#endif
 	return true;
 }
 
