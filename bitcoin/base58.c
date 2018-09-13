@@ -15,11 +15,20 @@
 #include <libbase58.h>
 #include <string.h>
 
-extern void groestl_single_hash(void *, const void * , size_t len);
+extern void groestlhash(void *, const void * , size_t len);
 
 static bool my_sha256(void *digest, const void *data, size_t datasz)
 {
-	groestl_single_hash((void *)&digest, (void *)data, datasz);
+	/* make groestl hash compatible to luke's lib */
+	static bool si = false;
+	uint32_t my_hash[16]; 
+
+	if (!si) {	si = true;
+			groestlhash((void *)my_hash, (void *)data, datasz);
+		} else {
+				memcpy(digest,my_hash,32); 
+				si = false;
+		}
 	return true;
 }
 
