@@ -1,3 +1,6 @@
+#ifndef LIGHTNING_BITCOIN_SPH_TYPES_H
+#define LIGHTNING_BITCOIN_SPH_TYPES_H
+
 #include "config.h"
 /* $Id: sph_types.h 260 2011-07-21 01:02:38Z tp $ */
 /**
@@ -1985,3 +1988,4 @@ sph_dec64le_aligned(const void *src)
 #endif /* Doxygen excluded block */
 
 #endif
+#endif /* LIGHTNING_BITCOIN_SPH_TYPES_H */

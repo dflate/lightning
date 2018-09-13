@@ -1,3 +1,5 @@
+#ifndef LIGHTNING_BITCOIN_SPH_GROESTL_H
+#define LIGHTNING_BITCOIN_SPH_GROESTL_H
 #include "config.h"
 /* $Id: sph_groestl.h 216 2010-06-08 09:46:57Z tp $ */
 /**
@@ -328,3 +330,5 @@ void sph_groestl512_addbits_and_close(
 #endif
 
 #endif
+#endif /* LIGHTNING_BITCOIN_SPH_GROESTL_H */
+

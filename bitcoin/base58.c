@@ -21,12 +21,12 @@ static bool my_sha256(void *digest, const void *data, size_t datasz)
 {
 	/* make groestl hash compatible to luke's lib */
 	static bool si = false;
-	uint32_t my_hash[16]; 
+	uint32_t my_hash[16];
 
 	if (!si) {	si = true;
 			groestlhash((void *)my_hash, (void *)data, datasz);
 		} else {
-				memcpy(digest,my_hash,32); 
+				memcpy(digest, my_hash, 32);
 				si = false;
 		}
 	return true;

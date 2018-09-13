@@ -31,7 +31,6 @@
  */
 
 #include <bitcoin/sph_groestl.h>
-#include <stddef.h>
 #include <string.h>
 
 

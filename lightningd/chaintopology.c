@@ -698,8 +698,6 @@ static void get_new_block(struct bitcoind *bitcoind,
 	}
 
 	bitcoind_getrawblock(bitcoind, blkid, have_new_block, topo);
-	
-
 }
 
 static void try_extend_tip(struct chain_topology *topo)
