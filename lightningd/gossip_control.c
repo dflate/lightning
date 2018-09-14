@@ -321,7 +321,7 @@ static void json_getroute(struct command *cmd, const char *buffer, const jsmntok
 static const struct json_command getroute_command = {
 	"getroute",
 	json_getroute,
-	"Show route to {id} for {msatoshi}, using {riskfactor} and optional {cltv} (default 9). "
+	"Show route to {id} for {mgro}, using {riskfactor} and optional {cltv} (default 9). "
 	"If specified search from {fromid} otherwise use this node as source. "
 	"Randomize the route with up to {fuzzpercent} (0.0 -> 100.0, default 5.0) "
 	"using {seed} as an arbitrary-size string seed."

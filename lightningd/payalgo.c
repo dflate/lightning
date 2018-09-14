@@ -700,7 +700,7 @@ static void json_pay(struct command *cmd,
 static const struct json_command pay_command = {
 	"pay",
 	json_pay,
-	"Send payment specified by {bolt11} with optional {msatoshi} "
+	"Send payment specified by {bolt11} with optional {mgro} "
 	"(if and only if {bolt11} does not have amount), "
 	"{description} (required if {bolt11} uses description hash), "
 	"{riskfactor} (default 1.0), "

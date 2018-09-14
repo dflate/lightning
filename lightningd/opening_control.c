@@ -844,6 +844,6 @@ static void json_fund_channel(struct command *cmd,
 static const struct json_command fund_channel_command = {
 	"fundchannel",
 	json_fund_channel,
-	"Fund channel with {id} using {satoshi} (or 'all') satoshis, at optional {feerate}"
+	"Fund channel with {id} using {gro} (or 'all') groshis, at optional {feerate}"
 };
 AUTODATA(json_command, &fund_channel_command);
