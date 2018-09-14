@@ -220,7 +220,7 @@ static char *opt_set_testnet(struct lightningd *ld)
 
 static char *opt_set_mainnet(struct lightningd *ld)
 {
-	return opt_set_network("bitcoin", ld);
+	return opt_set_network("groestlcoin", ld);
 }
 
 static void opt_show_network(char buf[OPT_SHOW_LEN],
@@ -355,9 +355,8 @@ static void config_register_opts(struct lightningd *ld)
 
 	opt_register_early_arg("--network", opt_set_network, opt_show_network,
 			       ld,
-			       "Select the network parameters (bitcoin, testnet,"
-			       " regtest, litecoin, litecoin-testnet, litecoin-regtest,"
-				   " groestlcoin, groestlcoin-testnet or groestlcoin-regtest)");
+			       "Select the network parameters ("
+				   " groestlcoin, testnet or groestlcoin-regtest)");
 	opt_register_early_noarg("--testnet", opt_set_testnet, ld,
 				 "Alias for --network=testnet");
 	opt_register_early_noarg("--mainnet", opt_set_mainnet, ld,
@@ -434,120 +433,6 @@ static void dev_register_opts(struct lightningd *ld)
 }
 #endif
 
-static const struct config testnet_config = {
-	/* 6 blocks to catch cheating attempts. */
-	.locktime_blocks = 6,
-
-	/* They can have up to 14 days, maximumu value that lnd will ask for by default. */
-	/* FIXME Convince lnd to use more reasonable defaults... */
-	.locktime_max = 14 * 24 * 6,
-
-	/* We're fairly trusting, under normal circumstances. */
-	.anchor_confirms = 1,
-
-	/* Testnet fees are crazy, allow infinite feerange. */
-	.commitment_fee_min_percent = 0,
-	.commitment_fee_max_percent = 0,
-
-	/* We offer to pay 5 times 2-block fee */
-	.commitment_fee_percent = 500,
-
-	/* Be aggressive on testnet. */
-	.cltv_expiry_delta = 6,
-	.cltv_final = 10,
-
-	/* Send commit 10msec after receiving; almost immediately. */
-	.commit_time_ms = 10,
-
-	/* Allow dust payments */
-	.fee_base = 1,
-	/* Take 0.001% */
-	.fee_per_satoshi = 10,
-
-	/* BOLT #7:
-	 *
-	 *   - SHOULD flush outgoing gossip messages once every 60
-	 *     seconds, independently of the arrival times of the messages.
-	 */
-	.broadcast_interval = 60000,
-
-	/* Send a keepalive update at least every week, prune every twice that */
-	.channel_update_interval = 1209600/2,
-
-	/* Testnet sucks */
-	.ignore_fee_limits = true,
-
-	/* Rescan 5 hours of blocks on testnet, it's reorg happy */
-	.rescan = 6 * 5,
-
-	/* Fees may be in the range our_fee - 10*our_fee */
-	.max_fee_multiplier = 10,
-
-	.use_dns = true,
-};
-
-/* aka. "Dude, where's my coins?" */
-static const struct config mainnet_config = {
-	/* ~one day to catch cheating attempts. */
-	.locktime_blocks = 6 * 24,
-
-	/* They can have up to 14 days, maximumu value that lnd will ask for by default. */
-	/* FIXME Convince lnd to use more reasonable defaults... */
-	.locktime_max = 14 * 24 * 6,
-
-	/* We're fairly trusting, under normal circumstances. */
-	.anchor_confirms = 3,
-
-	/* Insist between 2 and 20 times the 2-block fee. */
-	.commitment_fee_min_percent = 200,
-	.commitment_fee_max_percent = 2000,
-
-	/* We offer to pay 5 times 2-block fee */
-	.commitment_fee_percent = 500,
-
-	/* BOLT #2:
-	 *
-	 * 1. the `cltv_expiry_delta` for channels, `3R+2G+2S`: if in doubt, a
-	 *   `cltv_expiry_delta` of 12 is reasonable (R=2, G=1, S=2)
-	 */
-	/* R = 2, G = 1, S = 3 */
-	.cltv_expiry_delta = 14,
-
-	/* BOLT #2:
-	 *
-	 * 4. the minimum `cltv_expiry` accepted for terminal payments: the
-	 *    worst case for the terminal node C is `2R+G+S` blocks */
-	.cltv_final = 10,
-
-	/* Send commit 10msec after receiving; almost immediately. */
-	.commit_time_ms = 10,
-
-	/* Discourage dust payments */
-	.fee_base = 1000,
-	/* Take 0.001% */
-	.fee_per_satoshi = 10,
-
-	/* BOLT #7:
-	 *
-	 *   - SHOULD flush outgoing gossip messages once every 60
-	 *     seconds, independently of the arrival times of the messages.
-	 */
-	.broadcast_interval = 60000,
-
-	/* Send a keepalive update at least every week, prune every twice that */
-	.channel_update_interval = 1209600/2,
-
-	/* Mainnet should have more stable fees */
-	.ignore_fee_limits = false,
-
-	/* Rescan 2.5 hours of blocks on startup, it's not so reorg happy */
-	.rescan = 15,
-
-	/* Fees may be in the range our_fee - 10*our_fee */
-	.max_fee_multiplier = 10,
-
-	.use_dns = true,
-};
 
 static const struct config groestlcoin_testnet_config = {
 	/* 6 blocks to catch cheating attempts. */
@@ -664,100 +549,6 @@ static const struct config groestlcoin_mainnet_config = {
 	.use_dns = false,
 };
 
-static const struct config litecoin_testnet_config = {
-	/* 6 blocks to catch cheating attempts. */
-	.locktime_blocks = 6,
-
-	/* They can have up to 1 day. */
-	.locktime_max = 1 * 6 * 4 * 24,
-
-	/* Testnet fees are crazy, allow infinite feerange. */
-	.commitment_fee_min_percent = 0,
-	.commitment_fee_max_percent = 0,
-
-	/* We offer to pay 5 times 2-block fee */
-	.commitment_fee_percent = 500,
-
-	/* Be aggressive on testnet. */
-	.cltv_expiry_delta = 6,
-	.cltv_final = 6,
-
-	/* Allow dust payments */
-	.fee_base = 1,
-	/* Take 0.001% */
-	.fee_per_satoshi = 10,
-
-	/* BOLT #7:
-	 * Each node SHOULD flush outgoing announcements once every 60 seconds */
-	.broadcast_interval = 60000,
-
-	/* Send a keepalive update at least every week, prune every twice that */
-	.channel_update_interval = 1209600/2,
-
-	/* Testnet sucks */
-	.ignore_fee_limits = true,
-
-	/* Rescan 5 hours of blocks on testnet, it's reorg happy */
-	.rescan = 120,
-
-	/* Fees may be in the range our_fee - 10*our_fee */
-	.max_fee_multiplier = 10,
-
-	.use_dns = false
-	/* tGRS: 2NG31geD4jz2Sy6ddiKGm1k7dLHrKvozdDV */
-};
-
-/* aka. "Dude, where's my litecoins?" */
-static const struct config litecoin_mainnet_config = {
-	/* ~one day to catch cheating attempts. */
-	.locktime_blocks = 6 * 4 * 24,
-
-	/* They can have up to 1 day. */
-	.locktime_max = 1 * 6 * 4 * 24,
-
-	/* Insist between 2 and 20 times the 2-block fee. */
-	.commitment_fee_min_percent = 200,
-	.commitment_fee_max_percent = 2000,
-
-	/* We offer to pay 5 times 2-block fee */
-	.commitment_fee_percent = 500,
-
-	/* BOLT #2:
-	 *
-	 * The `cltv_expiry_delta` for channels.  `3R+2G+2S` */
-	/* R = 2, G = 1, S = 3 */
-	.cltv_expiry_delta = 14,
-
-	/* BOLT #2:
-	 *
-	 * The minimum `cltv_expiry` we will accept for terminal payments: the
-	 * worst case for the terminal node C lower at `2R+G+S` blocks */
-	.cltv_final = 8,
-
-	/* Discourage dust payments */
-	.fee_base = 1000,
-	/* Take 0.001% */
-	.fee_per_satoshi = 10,
-
-	/* BOLT #7:
-	 * Each node SHOULD flush outgoing announcements once every 60 seconds */
-	.broadcast_interval = 60000,
-
-	/* Send a keepalive update at least every week, prune every twice that */
-	.channel_update_interval = 1209600/2,
-
-	/* Mainnet should have more stable fees */
-	.ignore_fee_limits = false,
-
-	/* Rescan 2.5 hours of blocks on startup, it's not so reorg happy */
-	.rescan = 60,
-
-	/* Fees may be in the range our_fee - 10*our_fee */
-	.max_fee_multiplier = 10,
-
-	.use_dns = false
-	/* GRS: Fp1gMx4Q1jLtLHqVhc9h9dnVsD1tVUDM3i */
-};
 
 
 
@@ -780,27 +571,17 @@ static void check_config(struct lightningd *ld)
 
 static void setup_default_config(struct lightningd *ld)
 {
-	if (strstr(get_chainparams(ld)->network_name, "litecoin")) {
-		groestl=false;
-		if (get_chainparams(ld)->testnet)
-			ld->config = litecoin_testnet_config;
-		else
-			ld->config = litecoin_mainnet_config;
-	} else {
-		groestl=true;
-		if (strstr(get_chainparams(ld)->network_name, "groestlcoin")) {
+	if (strstr(get_chainparams(ld)->network_name, "groestlcoin")) {
 			if (get_chainparams(ld)->testnet)
 				ld->config = groestlcoin_testnet_config;
 			else
 				ld->config = groestlcoin_mainnet_config;
 	} else {
-		groestl=false;
-		if (get_chainparams(ld)->testnet)
-			ld->config = testnet_config;
-		else
-			ld->config = mainnet_config;
-		};
-};
+			if (get_chainparams(ld)->testnet)
+				ld->config = groestlcoin_testnet_config;
+			else
+				ld->config = groestlcoin_mainnet_config;
+		}
 
 	/* Set default PID file name to be per-network */
 	tal_free(ld->pidfile);

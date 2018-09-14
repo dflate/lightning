@@ -37,6 +37,4 @@ STRUCTEQ_DEF(sha256, 0, u);
 /* Define ripemd160_eq. */
 STRUCTEQ_DEF(ripemd160, 0, u);
 
-bool groestl;
-
 #endif /* LIGHTNING_COMMON_UTILS_H */

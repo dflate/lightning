@@ -3,24 +3,19 @@
 // Copyright (c) 2009-2012 The Bitcoin Developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-/* 
+/*
  * Copyright 2012-2014 Luke Dashjr
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the standard MIT license.  See COPYING for more details.
  */
 
-#ifndef WIN32
-#include <arpa/inet.h>
-#else
-#include <winsock2.h>
-#endif
-
 #include "address.h"
 #include "base58.h"
 #include "privkey.h"
 #include "pubkey.h"
 #include "shadouble.h"
+#include <arpa/inet.h>
 #include <assert.h>
 #include <bitcoin/base58.h>
 #include <bitcoin/chainparams.h>
@@ -56,16 +51,16 @@ bool b58tobin(void *bin, size_t *binszp, const char *b58, size_t b58sz)
 	uint8_t bytesleft = binsz % 4;
 	uint32_t zeromask = bytesleft ? (0xffffffff << (bytesleft * 8)) : 0;
 	unsigned zerocount = 0;
-	
+
 	if (!b58sz)
 		b58sz = strlen(b58);
-	
+
 	memset(outi, 0, outisz * sizeof(*outi));
-	
+
 	// Leading zeros, just count
 	for (i = 0; i < b58sz && b58u[i] == '1'; ++i)
 		++zerocount;
-	
+
 	for ( ; i < b58sz; ++i)
 	{
 		if (b58u[i] & 0x80)
@@ -88,7 +83,7 @@ bool b58tobin(void *bin, size_t *binszp, const char *b58, size_t b58sz)
 			// Output number too big (last int32 filled too far)
 			return false;
 	}
-	
+
 	j = 0;
 	switch (bytesleft) {
 		case 3:
@@ -101,7 +96,7 @@ bool b58tobin(void *bin, size_t *binszp, const char *b58, size_t b58sz)
 		default:
 			break;
 	}
-	
+
 	for (; j < outisz; ++j)
 	{
 		*(binu++) = (outi[j] >> 0x18) & 0xff;
@@ -109,7 +104,7 @@ bool b58tobin(void *bin, size_t *binszp, const char *b58, size_t b58sz)
 		*(binu++) = (outi[j] >>    8) & 0xff;
 		*(binu++) = (outi[j] >>    0) & 0xff;
 	}
-	
+
 	// Count canonical base58 byte count
 	binu = bin;
 	for (i = 0; i < binsz; ++i)
@@ -119,18 +114,14 @@ bool b58tobin(void *bin, size_t *binszp, const char *b58, size_t b58sz)
 		--*binszp;
 	}
 	*binszp += zerocount;
-	
+
 	return true;
 }
 
 static
 bool my_dblsha256(void *hash, const void *data, size_t datasz)
 {
-	uint8_t buf[0x20];
-	if(groestl)
-		return b58_sha256_impl(hash, data, datasz); 
-	else
-		return b58_sha256_impl(buf, data, datasz) && b58_sha256_impl(hash, buf, sizeof(buf));
+		return b58_sha256_impl(hash, data, datasz);
 }
 
 int b58check(const void *bin, size_t binsz, const char *base58str, size_t b58sz)
@@ -144,13 +135,13 @@ int b58check(const void *bin, size_t binsz, const char *base58str, size_t b58sz)
 		return -2;
 	if (memcmp(&binc[binsz - 4], buf, 4))
 		return -1;
-	
+
 	// Check number of zeros is correct AFTER verifying checksum (to avoid possibility of accessing base58str beyond the end)
 	for (i = 0; binc[i] == '\0' && base58str[i] == '1'; ++i)
 	{}  // Just finding the end of zeros, nothing to do in loop
 	if (binc[i] == '\0' || base58str[i] == '1')
 		return -3;
-	
+
 	return binc[0];
 }
 
@@ -162,14 +153,14 @@ bool b58enc(char *b58, size_t *b58sz, const void *data, size_t binsz)
 	int carry;
 	ssize_t i, j, high, zcount = 0;
 	size_t size;
-	
+
 	while (zcount < binsz && !bin[zcount])
 		++zcount;
-	
+
 	size = (binsz - zcount) * 138 / 100 + 1;
 	uint8_t buf[size];
 	memset(buf, 0, size);
-	
+
 	for (i = zcount, high = size - 1; i < binsz; ++i, high = j)
 	{
 		for (carry = bin[i], j = size - 1; (j > high) || carry; --j)
@@ -179,22 +170,22 @@ bool b58enc(char *b58, size_t *b58sz, const void *data, size_t binsz)
 			carry /= 58;
 		}
 	}
-	
+
 	for (j = 0; j < size && !buf[j]; ++j);
-	
+
 	if (*b58sz <= zcount + size - j)
 	{
 		*b58sz = zcount + size - j + 1;
 		return false;
 	}
-	
+
 	if (zcount)
 		memset(b58, '1', zcount);
 	for (i = zcount; j < size; ++i, ++j)
 		b58[i] = b58digits_ordered[buf[j]];
 	b58[i] = '\0';
 	*b58sz = i + 1;
-	
+
 	return true;
 }
 
@@ -202,7 +193,7 @@ bool b58check_enc(char *b58c, size_t *b58c_sz, uint8_t ver, const void *data, si
 {
 	uint8_t buf[1 + datasz + 0x20];
 	uint8_t *hash = &buf[1 + datasz];
-	
+
 	buf[0] = ver;
 	memcpy(&buf[1], data, datasz);
 	if (!my_dblsha256(hash, buf, datasz + 1))
@@ -210,25 +201,19 @@ bool b58check_enc(char *b58c, size_t *b58c_sz, uint8_t ver, const void *data, si
 		*b58c_sz = 0;
 		return false;
 	}
-	
+
 	return b58enc(b58c, b58c_sz, buf, 1 + datasz + 4);
 }
 
 
-
-
-
 static bool my_sha256(void *digest, const void *data, size_t datasz)
 {
-	if( groestl )
-		groestlhash((void *)digest, (void *)data, datasz);
-	else
-		sha256(digest, data, datasz);
+	groestlhash((void *)digest, (void *)data, datasz);
 	return true;
 }
 
 static char *to_base58(const tal_t *ctx, u8 version,
-		       const struct ripemd160 *rmd)
+			   const struct ripemd160 *rmd)
 {
 	char out[BASE58_ADDR_MAX_LEN + 1];
 	size_t outlen = sizeof(out);
@@ -248,7 +233,7 @@ char *bitcoin_to_base58(const tal_t *ctx, bool test_net,
 }
 
 char *p2sh_to_base58(const tal_t *ctx, bool test_net,
-		     const struct ripemd160 *p2sh)
+			 const struct ripemd160 *p2sh)
 {
 	return to_base58(ctx, test_net ? 196 : 5, p2sh);
 }
@@ -290,8 +275,8 @@ bool bitcoin_from_base58(bool *test_net,
 }
 
 bool p2sh_from_base58(bool *test_net,
-		      struct ripemd160 *p2sh,
-		      const char *base58, size_t len)
+			  struct ripemd160 *p2sh,
+			  const char *base58, size_t len)
 {
 	u8 version;
 
@@ -308,7 +293,7 @@ bool p2sh_from_base58(bool *test_net,
 }
 
 bool key_from_base58(const char *base58, size_t base58_len,
-		     bool *test_net, struct privkey *priv, struct pubkey *key)
+			 bool *test_net, struct privkey *priv, struct pubkey *key)
 {
 	// 1 byte version, 32 byte private key, 1 byte compressed, 4 byte checksum
 	u8 keybuf[1 + 32 + 1 + 4];
