@@ -781,17 +781,20 @@ static void check_config(struct lightningd *ld)
 static void setup_default_config(struct lightningd *ld)
 {
 	if (strstr(get_chainparams(ld)->network_name, "litecoin")) {
+		groestl=false;
 		if (get_chainparams(ld)->testnet)
 			ld->config = litecoin_testnet_config;
 		else
 			ld->config = litecoin_mainnet_config;
 	} else {
+		groestl=true;
 		if (strstr(get_chainparams(ld)->network_name, "groestlcoin")) {
 			if (get_chainparams(ld)->testnet)
 				ld->config = groestlcoin_testnet_config;
 			else
 				ld->config = groestlcoin_mainnet_config;
 	} else {
+		groestl=false;
 		if (get_chainparams(ld)->testnet)
 			ld->config = testnet_config;
 		else
