@@ -527,8 +527,8 @@ static void json_dev_rescan_outputs(struct command *cmd,
 static const struct json_command dev_rescan_output_command = {
 	"dev-rescan-outputs",
 	json_dev_rescan_outputs,
-	"Synchronize the state of our funds with bitcoind",
+	"Synchronize the state of our funds with groestlcoind",
 	false,
-	"For each output stored in the internal wallet ask `bitcoind` whether we are in sync with its state (spent vs. unspent)"
+	"For each output stored in the internal wallet ask `groestlcoind` whether we are in sync with its state (spent vs. unspent)"
 };
 AUTODATA(json_command, &dev_rescan_output_command);
