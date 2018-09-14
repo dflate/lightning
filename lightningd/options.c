@@ -329,14 +329,14 @@ static void config_register_opts(struct lightningd *ld)
 			 "Time after changes before sending out COMMIT");
 	opt_register_arg("--fee-base", opt_set_u32, opt_show_u32,
 			 &ld->config.fee_base,
-			 "Millisatoshi minimum to charge for HTLC");
+			 "Milligroshi minimum to charge for HTLC");
 	opt_register_arg("--rescan", opt_set_s32, opt_show_s32,
 			 &ld->config.rescan,
 			 "Number of blocks to rescan from the current head, or "
 			 "absolute blockheight if negative");
-	opt_register_arg("--fee-per-satoshi", opt_set_s32, opt_show_s32,
+	opt_register_arg("--fee-per-groshi", opt_set_s32, opt_show_s32,
 			 &ld->config.fee_per_satoshi,
-			 "Microsatoshi fee for every satoshi in HTLC");
+			 "Microgroshi fee for every groshi in HTLC");
 	opt_register_arg("--addr", opt_add_addr, NULL,
 			 ld,
 			 "Set an IP address (v4 or v6) to listen on and announce to the network for incoming connections");
