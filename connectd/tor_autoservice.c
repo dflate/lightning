@@ -80,8 +80,10 @@ static struct wireaddr *make_onion(const tal_t *ctx,
 
 //V3 tor after 3.3.3.aplha FIXME: TODO SAIBATO
 //sprintf((char *)reach->buffer,"ADD_ONION NEW:ED25519-V3 Port=9735,127.0.0.1:9735\r\n");
+//V2 ADD_ONION NEW:RSA1024 Port=%d,%s Flags=DiscardPK,Detach",
 	tor_send_cmd(rbuf,
-		     tal_fmt(tmpctx, "ADD_ONION NEW:RSA1024 Port=%d,%s Flags=DiscardPK,Detach",
+			/* make V3 the default */
+			tal_fmt(tmpctx, "ADD_ONION NEW:ED25519-V3 Port=%d,%s Flags=DiscardPK,Detach",
 			     /* FIXME: We *could* allow user to set Tor port */
 			     DEFAULT_PORT, fmt_wireaddr(tmpctx, local)));
 
@@ -97,7 +99,7 @@ static struct wireaddr *make_onion(const tal_t *ctx,
 
 		name = tal_fmt(tmpctx, "%s.onion", line);
 		onion = tal(ctx, struct wireaddr);
-		if (!parse_wireaddr(name, onion, 0, false, NULL))
+		if (!parse_wireaddr(name, onion, DEFAULT_PORT, false, NULL))
 			status_failed(STATUS_FAIL_INTERNAL_ERROR,
 				      "Tor gave bad onion name '%s'", name);
 		discard_remaining_response(rbuf);

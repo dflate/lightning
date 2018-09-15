@@ -667,7 +667,7 @@ static void json_add_peer(struct lightningd *ld,
 			     channel->funding_satoshi * 1000);
 
 		/* channel config */
-		json_add_u64(response, "dust_limit_groshi",
+		json_add_u64(response, "dust_limit_gro",
 			     channel->our_config.dust_limit_satoshis);
 		json_add_u64(response, "max_htlc_value_in_flight_mgro",
 			     channel->our_config.max_htlc_value_in_flight_msat);
@@ -679,9 +679,9 @@ static void json_add_peer(struct lightningd *ld,
 		 * is imposed on their side, while their
 		 * configuration `channel_reserve_satoshis` is
 		 * imposed on ours. */
-		json_add_u64(response, "their_channel_reserve_groshi",
+		json_add_u64(response, "their_channel_reserve_gro",
 			     channel->our_config.channel_reserve_satoshis);
-		json_add_u64(response, "our_channel_reserve_groshi",
+		json_add_u64(response, "our_channel_reserve_gro",
 			     channel->channel_info.their_config.channel_reserve_satoshis);
 		/* Compute how much we can send via this channel. */
 		if (channel->our_msatoshi <= our_reserve_msat)

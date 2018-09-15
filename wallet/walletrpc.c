@@ -163,7 +163,7 @@ static const struct json_command withdraw_command = {
 	"withdraw",
 	json_withdraw,
 	"Send to {destination} address {gro} (or 'all') amount via Groestlcoin transaction, at optional {feerate}",
-	false, "Send funds from the internal wallet to the specified address. Either specify a number of groshi to send or 'all' to sweep all funds in the internal wallet to the address."
+	false, "Send funds from the internal wallet to the specified address. Either specify a number of gro's to send or 'all' to sweep all funds in the internal wallet to the address."
 };
 AUTODATA(json_command, &withdraw_command);
 
@@ -435,9 +435,9 @@ static void json_listfunds(struct command *cmd, const char *buffer UNUSED,
 							  c->scid);
 
 			/* Poor man's rounding to satoshis to match the unit for outputs */
-			json_add_u64(response, "channel_groshi",
+			json_add_u64(response, "channel_gro",
 				     (c->our_msatoshi + 500)/1000);
-			json_add_u64(response, "channel_total_groshi",
+			json_add_u64(response, "channel_total_gro",
 				     c->funding_satoshi);
 			json_add_txid(response, "funding_txid",
 				      &c->funding_txid);
