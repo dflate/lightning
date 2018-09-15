@@ -42,7 +42,7 @@
 #include <bitcoin/sph_types.h>
 #include <stddef.h>
 
-#define SPH_64_TRUE 0
+#define SPH_64_TRUE 1
 #define SPH_GROESTL_LITTLE_ENDIAN 0
 #define SPH_GROESTL_BIG_ENDIAN 1
 /**

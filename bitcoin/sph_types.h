@@ -57,11 +57,12 @@
 
 #define SPH_NO_64 0
 #define SPH_BIG_ENDIAN 1
-#define SPH_SPARCV9_GCC 0
-#define SPH_AMD64_GCC 0
+#define SPH_SPARCV9_GCC defined SPH_SPARCV9_GCC
+#define SPH_AMD64_GCC defined SPH_AMD64_GCC
+#define SPH_I386_GCC defined SPH_SPH_I386_GCC
 #define SPH_NO_ASM 1
 #define SPH_SMALL_FOOTPRINT 1
-#define SPH_64_TRUE 0
+#define SPH_64_TRUE 1
 
 /*
  * All our I/O functions are defined over octet streams. We do not know
