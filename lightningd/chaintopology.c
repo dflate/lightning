@@ -526,7 +526,7 @@ static void json_feerates(struct command *cmd,
 static const struct json_command feerates_command = {
 	"feerates",
 	json_feerates,
-	"Return feerate estimates, either gro-per-kw ({style} perkw) or groshi-per-kb ({style} perkb)."
+	"Return feerate estimates, either gro-per-kw ({style} perkw) or gro-per-kb ({style} perkb)."
 };
 AUTODATA(json_command, &feerates_command);
 
