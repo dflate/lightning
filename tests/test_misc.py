@@ -329,7 +329,7 @@ def test_bech32_funding(node_factory):
     # fund a bech32 address and then open a channel with it
     res = l1.openchannel(l2, 20000, 'bech32')
     address = res['address']
-    assert address[0:4] == "bcrt"
+    assert address[0:4] == "grsrt"
 
     # probably overly paranoid checking
     wallettxid = res['wallettxid']
