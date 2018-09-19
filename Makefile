@@ -38,7 +38,7 @@ ifeq ($(COMPAT),1)
 COMPAT_CFLAGS=-DCOMPAT_V052=1 -DCOMPAT_V060=1
 endif
 
-PYTEST_OPTS := -v -x
+PYTEST_OPTS := -v
 
 # This is where we add new features as bitcoin adds them.
 FEATURES :=
@@ -186,7 +186,6 @@ include external/Makefile
 include bitcoin/Makefile
 include common/Makefile
 include wire/Makefile
-include wallet/Makefile
 include hsmd/Makefile
 include gossipd/Makefile
 include openingd/Makefile
@@ -206,8 +205,14 @@ ifneq ($(TEST_GROUP_COUNT),)
 PYTEST_OPTS += --test-group=$(TEST_GROUP) --test-group-count=$(TEST_GROUP_COUNT)
 endif
 
+# If we run the tests in parallel we can speed testing up by a lot, however we
+# then don't exit on the first error, since that'd kill the other tester
+# processes and result in loads in loads of output. So we only tell py.test to
+# abort early if we aren't running in parallel.
 ifneq ($(PYTEST_PAR),)
 PYTEST_OPTS += -n=$(PYTEST_PAR)
+else
+PYTEST_OPTS += -x
 endif
 
 check:
@@ -240,8 +245,10 @@ check-makefile:
 bolt-check/%: % bolt-precheck tools/check-bolt
 	@[ ! -d .tmp.lightningrfc ] || tools/check-bolt .tmp.lightningrfc $<
 
+LOCAL_BOLTDIR=.tmp.lightningrfc
+
 bolt-precheck:
-	@rm -rf .tmp.lightningrfc; if [ ! -d $(BOLTDIR) ]; then echo Not checking BOLT references: BOLTDIR $(BOLTDIR) does not exist >&2; exit 0; fi; set -e; if [ -n "$(BOLTVERSION)" ]; then git clone -q $(BOLTDIR) .tmp.lightningrfc && cd .tmp.lightningrfc && git checkout -q $(BOLTVERSION); else cp -a $(BOLTDIR) .tmp.lightningrfc; fi
+	@rm -rf $(LOCAL_BOLTDIR); if [ ! -d $(BOLTDIR) ]; then echo Not checking BOLTs: BOLTDIR $(BOLTDIR) does not exist >&2; exit 0; fi; set -e; if [ -n "$(BOLTVERSION)" ]; then git clone -q $(BOLTDIR) $(LOCAL_BOLTDIR) && cd $(LOCAL_BOLTDIR) && git checkout -q $(BOLTVERSION); else cp -a $(BOLTDIR) $(LOCAL_BOLTDIR); fi
 
 check-source-bolt: $(ALL_TEST_PROGRAMS:%=bolt-check/%.c)
 
