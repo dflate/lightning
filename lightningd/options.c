@@ -356,11 +356,11 @@ static void config_register_opts(struct lightningd *ld)
 	opt_register_early_arg("--network", opt_set_network, opt_show_network,
 			       ld,
 			       "Select the network parameters ("
-				   " groestlcoin, testnet or groestlcoin-regtest)");
+				   " groestlcoin, testnet or regtest)");
 	opt_register_early_noarg("--testnet", opt_set_testnet, ld,
 				 "Alias for --network=testnet");
 	opt_register_early_noarg("--mainnet", opt_set_mainnet, ld,
-				 "Alias for --network=bitcoin");
+				 "Alias for --network=groestlcoin");
 	opt_register_early_arg("--allow-deprecated-apis",
 			       opt_set_bool_arg, opt_show_bool,
 			       &deprecated_apis,
@@ -434,7 +434,7 @@ static void dev_register_opts(struct lightningd *ld)
 #endif
 
 
-static const struct config groestlcoin_testnet_config = {
+static const struct config testnet_config = {
 	/* 6 blocks to catch cheating attempts. */
 	.locktime_blocks = 6,
 
@@ -487,7 +487,7 @@ static const struct config groestlcoin_testnet_config = {
 };
 
 /* aka. "Dude, where's my coins?" */
-static const struct config groestlcoin_mainnet_config = {
+static const struct config mainnet_config = {
 	/* ~one day to catch cheating attempts. */
 	.locktime_blocks = 60 * 24 ,
 
@@ -571,17 +571,10 @@ static void check_config(struct lightningd *ld)
 
 static void setup_default_config(struct lightningd *ld)
 {
-	if (strstr(get_chainparams(ld)->network_name, "groestlcoin")) {
 			if (get_chainparams(ld)->testnet)
-				ld->config = groestlcoin_testnet_config;
+				ld->config = testnet_config;
 			else
-				ld->config = groestlcoin_mainnet_config;
-	} else {
-			if (get_chainparams(ld)->testnet)
-				ld->config = groestlcoin_testnet_config;
-			else
-				ld->config = groestlcoin_mainnet_config;
-		}
+				ld->config = mainnet_config;
 
 	/* Set default PID file name to be per-network */
 	tal_free(ld->pidfile);
