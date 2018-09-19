@@ -1,6 +1,6 @@
 FROM fedora:28
 
-ENV BITCOIN_VERSION 0.16.0
+ENV GROESTLCOIN_VERSION 2.16.0
 WORKDIR /tmp
 
 RUN dnf update -y && \
@@ -23,10 +23,10 @@ RUN dnf update -y && \
 		zlib-devel && \
 	dnf clean all
 
-RUN wget https://bitcoin.org/bin/bitcoin-core-$BITCOIN_VERSION/bitcoin-$BITCOIN_VERSION-x86_64-linux-gnu.tar.gz -O bitcoin.tar.gz && \
-    tar -xvzf bitcoin.tar.gz && \
-    mv bitcoin-$BITCOIN_VERSION/bin/bitcoin* /usr/local/bin/ && \
-    rm -rf bitcoin.tar.gz bitcoin-$BITCOIN_VERSION
+RUN wget https://github.com/Groestlcoin/groestlcoin/releases/download/v2.16.0/groestlcoin-2.16.0-x86_64-linux-gnu.tar.gz -O groestlcoin.tar.gz && \
+    tar -xvzf groestlcoin.tar.gz && \
+    mv groestlcoin-$GROESTLCOIN_VERSION/bin/groestlcoin* /usr/local/bin/ && \
+    rm -rf groestlcoin.tar.gz groestlcoin-$GROESTLCOIN_VERSION
 
 RUN python3 -m pip install --upgrade pip && \
     python3 -m pip install python-bitcoinlib==0.7.0 pytest==3.0.5 setuptools==36.6.0 pytest-test-groups==1.0.3 flake8==3.5.0 pytest-rerunfailures==3.1 ephemeral-port-reserve==1.1.0
