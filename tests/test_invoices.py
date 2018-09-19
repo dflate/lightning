@@ -17,7 +17,7 @@ def test_invoice(node_factory):
     inv = l1.rpc.invoice(123000, 'label', 'description', '3700', [addr1, addr2])
     after = int(time.time())
     b11 = l1.rpc.decodepay(inv['bolt11'])
-    assert b11['currency'] == 'bcrt'
+    assert b11['currency'] == 'grsrt'
     assert b11['created_at'] >= before
     assert b11['created_at'] <= after
     assert b11['payment_hash'] == inv['payment_hash']
