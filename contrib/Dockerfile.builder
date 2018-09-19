@@ -2,7 +2,7 @@ FROM ubuntu:16.04
 MAINTAINER Christian Decker <decker.christian@gmail.com>
 
 ENV DEBIAN_FRONTEND noninteractive
-ENV BITCOIN_VERSION 0.16.0
+ENV GROESTLCOIN_VERSION 2.16.0
 
 WORKDIR /build
 
@@ -45,10 +45,10 @@ ENV LC_ALL=en_US.UTF-8
 RUN locale-gen en_US.UTF-8 && dpkg-reconfigure locales
 
 RUN cd /tmp/ && \
-    wget https://bitcoin.org/bin/bitcoin-core-$BITCOIN_VERSION/bitcoin-$BITCOIN_VERSION-x86_64-linux-gnu.tar.gz -O bitcoin.tar.gz && \
-    tar -xvzf bitcoin.tar.gz && \
-    mv /tmp/bitcoin-$BITCOIN_VERSION/bin/bitcoin* /usr/local/bin/ && \
-    rm -rf bitcoin.tar.gz /tmp/bitcoin-$BITCOIN_VERSION
+    wget https://github.com/Groestlcoin/groestlcoin/releases/download/v2.16.0/groestlcoin-2.16.0-x86_64-linux-gnu.tar.gz -O groestlcoin.tar.gz && \
+    tar -xvzf groestlcoin.tar.gz && \
+    mv /tmp/groestlcoin-$GROESTLCOIN_VERSION/bin/groestlcoin* /usr/local/bin/ && \
+    rm -rf groestlcoin.tar.gz /tmp/groestlcoin-$GROESTLCOIN_VERSION
 
 RUN pip3 install --upgrade pip && \
     python3 -m pip install python-bitcoinlib==0.7.0 pytest==3.0.5 setuptools==36.6.0 pytest-test-groups==1.0.3 flake8==3.5.0 pytest-rerunfailures==3.1 ephemeral-port-reserve==1.1.0 pytest-xdist==1.22.2 flaky==3.4.0 CherryPy==17.3.0 Flask==1.0.2
