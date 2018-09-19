@@ -7,7 +7,7 @@ from lightning import LightningRpc
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("bolt11_or_destination_id")
-parser.add_argument("amount_in_milli_satoshi", default=None, type=int, nargs="?")
+parser.add_argument("amount_in_milli_gro", default=None, type=int, nargs="?")
 parser.add_argument("payment_hash", nargs="?")
 args = parser.parse_args()
 
@@ -29,13 +29,13 @@ if prefix == "ln":
     bolt11 = ld.decodepay(args.bolt11_or_destination_id)
     id_ = bolt11["payee"]
     payment_hash = bolt11["payment_hash"]
-    if "msatoshi" in bolt11:
-        amount = bolt11["msatoshi"]
+    if "mgro" in bolt11:
+        amount = bolt11["mgro"]
     else:
-        assert args.amount_in_milli_satoshi, "need argument amount_in_milli_satoshi"
+        assert args.amount_in_milli_satoshi, "need argument amount_in_milli_gro"
         amount = args.amount_in_milli_satoshi
 else:
-    assert args.amount_in_milli_satoshi, "need argument amount_in_milli_satoshi"
+    assert args.amount_in_milli_satoshi, "need argument amount_in_milli_gro"
     assert args.payment_hash, "need argument payment_hash"
     amount = args.amount_in_milli_satoshi
     id_ = args.bolt11_or_destination_id
