@@ -27,6 +27,7 @@
 #include <lightningd/jsonrpc_errors.h>
 #include <lightningd/log.h>
 #include <lightningd/param.h>
+#include <lightningd/ping.h>
 #include <sodium/randombytes.h>
 #include <string.h>
 #include <wire/gen_peer_wire.h>
@@ -121,7 +122,6 @@ static unsigned gossip_msg(struct subd *gossip, const u8 *msg, const int *fds)
 	case WIRE_GOSSIP_GETNODES_REPLY:
 	case WIRE_GOSSIP_GETROUTE_REPLY:
 	case WIRE_GOSSIP_GETCHANNELS_REPLY:
-	case WIRE_GOSSIP_PING_REPLY:
 	case WIRE_GOSSIP_SCIDS_REPLY:
 	case WIRE_GOSSIP_QUERY_CHANNEL_RANGE_REPLY:
 	case WIRE_GOSSIP_RESOLVE_CHANNEL_REPLY:
@@ -129,6 +129,10 @@ static unsigned gossip_msg(struct subd *gossip, const u8 *msg, const int *fds)
 	case WIRE_GOSSIP_LOCAL_ADD_CHANNEL:
 	case WIRE_GOSSIP_LOCAL_CHANNEL_UPDATE:
 	case WIRE_GOSSIP_LOCAL_CHANNEL_CLOSE:
+		break;
+
+	case WIRE_GOSSIP_PING_REPLY:
+		ping_reply(gossip, msg);
 		break;
 
 	case WIRE_GOSSIP_GET_TXOUT:
@@ -457,7 +461,7 @@ static void json_dev_query_scids(struct command *cmd,
 static const struct json_command dev_query_scids_command = {
 	"dev-query-scids",
 	json_dev_query_scids,
-	"Query {peerid} for [scids]"
+	"Query peer {id} for [scids]"
 };
 AUTODATA(json_command, &dev_query_scids_command);
 
@@ -487,7 +491,7 @@ static void json_dev_send_timestamp_filter(struct command *cmd,
 static const struct json_command dev_send_timestamp_filter = {
 	"dev-send-timestamp-filter",
 	json_dev_send_timestamp_filter,
-	"Send {peerid} the timestamp filter {first} {range}"
+	"Send peer {id} the timestamp filter {first} {range}"
 };
 AUTODATA(json_command, &dev_send_timestamp_filter);
 
@@ -554,7 +558,7 @@ static void json_dev_query_channel_range(struct command *cmd,
 static const struct json_command dev_query_channel_range_command = {
 	"dev-query-channel-range",
 	json_dev_query_channel_range,
-	"Query {peerid} for short_channel_ids for {first} block + {num} blocks"
+	"Query peer {id} for short_channel_ids for {first} block + {num} blocks"
 };
 AUTODATA(json_command, &dev_query_channel_range_command);
 
