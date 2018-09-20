@@ -373,7 +373,7 @@ static char const *stringify_route(const tal_t *ctx, struct route_hop *route)
 	size_t i;
 	char *rv = tal_strdup(ctx, "us");
 	for (i = 0; i < tal_count(route); ++i)
-		tal_append_fmt(&rv, " -> %s (%"PRIu64"msat, %"PRIu32"blk) -> %s",
+		tal_append_fmt(&rv, " -> %s (%"PRIu64"mgro, %"PRIu32"blk) -> %s",
 			       type_to_string(ctx, struct short_channel_id, &route[i].channel_id),
 			       route[i].amount, route[i].delay,
 			       type_to_string(ctx, struct pubkey, &route[i].nodeid));
@@ -700,7 +700,7 @@ static void json_pay(struct command *cmd,
 static const struct json_command pay_command = {
 	"pay",
 	json_pay,
-	"Send payment specified by {bolt11} with optional {msatoshi} "
+	"Send payment specified by {bolt11} with optional {mgro} "
 	"(if and only if {bolt11} does not have amount), "
 	"{description} (required if {bolt11} uses description hash), "
 	"{riskfactor} (default 1.0), "

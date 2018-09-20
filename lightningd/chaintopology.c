@@ -526,7 +526,7 @@ static void json_feerates(struct command *cmd,
 static const struct json_command feerates_command = {
 	"feerates",
 	json_feerates,
-	"Return feerate estimates, either satoshi-per-kw ({style} perkw) or satoshi-per-kb ({style} perkb)."
+	"Return feerate estimates, either gro-per-kw ({style} perkw) or gro-per-kb ({style} perkb)."
 };
 AUTODATA(json_command, &feerates_command);
 
@@ -617,6 +617,7 @@ static void add_tip(struct chain_topology *topo, struct block *b)
 	topo->max_blockheight = b->height;
 }
 
+
 static struct block *new_block(struct chain_topology *topo,
 			       struct bitcoin_block *blk,
 			       unsigned int height)
@@ -624,6 +625,7 @@ static struct block *new_block(struct chain_topology *topo,
 	struct block *b = tal(topo, struct block);
 
 	sha256_double(&b->blkid.shad, &blk->hdr, sizeof(blk->hdr));
+
 	log_debug(topo->log, "Adding block %u: %s",
 		  height,
 		  type_to_string(tmpctx, struct bitcoin_blkid, &b->blkid));
@@ -641,19 +643,22 @@ static struct block *new_block(struct chain_topology *topo,
 	return b;
 }
 
+
+
 static void remove_tip(struct chain_topology *topo)
 {
-	struct block *b = topo->tip;
+
 	struct bitcoin_txid *txs;
 	size_t i, n;
+	struct block *b;
 
+	b = topo->tip;
 	/* Move tip back one. */
 	topo->tip = b->prev;
-	if (!topo->tip)
+	if (!(topo->tip))
 		fatal("Initial block %u (%s) reorganized out!",
 		      b->height,
 		      type_to_string(tmpctx, struct bitcoin_blkid, &b->blkid));
-
 	txs = wallet_transactions_by_height(b, topo->ld->wallet, b->height);
 	n = tal_count(txs);
 
@@ -691,6 +696,7 @@ static void get_new_block(struct bitcoind *bitcoind,
 		updates_complete(topo);
 		return;
 	}
+
 	bitcoind_getrawblock(bitcoind, blkid, have_new_block, topo);
 }
 

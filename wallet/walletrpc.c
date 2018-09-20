@@ -162,8 +162,8 @@ static void json_withdraw(struct command *cmd,
 static const struct json_command withdraw_command = {
 	"withdraw",
 	json_withdraw,
-	"Send to {destination} address {satoshi} (or 'all') amount via Bitcoin transaction, at optional {feerate}",
-	false, "Send funds from the internal wallet to the specified address. Either specify a number of satoshis to send or 'all' to sweep all funds in the internal wallet to the address."
+	"Send to {destination} address {gro} (or 'all') amount via Groestlcoin transaction, at optional {feerate}",
+	false, "Send funds from the internal wallet to the specified address. Either specify a number of gro's to send or 'all' to sweep all funds in the internal wallet to the address."
 };
 AUTODATA(json_command, &withdraw_command);
 
@@ -435,9 +435,9 @@ static void json_listfunds(struct command *cmd, const char *buffer UNUSED,
 							  c->scid);
 
 			/* Poor man's rounding to satoshis to match the unit for outputs */
-			json_add_u64(response, "channel_sat",
+			json_add_u64(response, "channel_gro",
 				     (c->our_msatoshi + 500)/1000);
-			json_add_u64(response, "channel_total_sat",
+			json_add_u64(response, "channel_total_gro",
 				     c->funding_satoshi);
 			json_add_txid(response, "funding_txid",
 				      &c->funding_txid);
@@ -527,8 +527,8 @@ static void json_dev_rescan_outputs(struct command *cmd,
 static const struct json_command dev_rescan_output_command = {
 	"dev-rescan-outputs",
 	json_dev_rescan_outputs,
-	"Synchronize the state of our funds with bitcoind",
+	"Synchronize the state of our funds with groestlcoind",
 	false,
-	"For each output stored in the internal wallet ask `bitcoind` whether we are in sync with its state (spent vs. unspent)"
+	"For each output stored in the internal wallet ask `groestlcoind` whether we are in sync with its state (spent vs. unspent)"
 };
 AUTODATA(json_command, &dev_rescan_output_command);

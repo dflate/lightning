@@ -2281,7 +2281,7 @@ static void handle_offer_htlc(struct peer *peer, const u8 *inmsg)
 	e = channel_add_htlc(peer->channel, LOCAL, peer->htlc_id,
 			     amount_msat, cltv_expiry, &payment_hash,
 			     onion_routing_packet, NULL);
-	status_trace("Adding HTLC %"PRIu64" msat=%"PRIu64" cltv=%u gave %s",
+	status_trace("Adding HTLC %"PRIu64" mgro=%"PRIu64" cltv=%u gave %s",
 		     peer->htlc_id, amount_msat, cltv_expiry,
 		     channel_add_err_name(e));
 

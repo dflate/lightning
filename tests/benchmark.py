@@ -23,7 +23,7 @@ def executor():
 
 @pytest.fixture(scope="module")
 def bitcoind():
-    bitcoind = utils.BitcoinD(rpcport=28332)
+    bitcoind = utils.BitcoinD(rpcport=21441)
     bitcoind.start()
     info = bitcoind.rpc.getblockchaininfo()
     # Make sure we have segwit and some funds

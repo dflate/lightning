@@ -1,6 +1,8 @@
 #include <assert.h>
+#include <bitcoin/groestl.c>
 #include <bitcoin/pullpush.c>
 #include <bitcoin/shadouble.c>
+#include <bitcoin/sph_groestl.c>
 #include <bitcoin/tx.c>
 #include <bitcoin/varint.c>
 #include <ccan/str/hex/hex.h>

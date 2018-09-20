@@ -5,12 +5,14 @@ BITCOIN_SRC :=					\
 	bitcoin/block.c				\
 	bitcoin/chainparams.c			\
 	bitcoin/locktime.c			\
+	bitcoin/groestl.c			\
 	bitcoin/privkey.c			\
 	bitcoin/pubkey.c			\
 	bitcoin/pullpush.c			\
 	bitcoin/script.c			\
 	bitcoin/shadouble.c			\
 	bitcoin/short_channel_id.c		\
+	bitcoin/sph_groestl.c		\
 	bitcoin/signature.c			\
 	bitcoin/tx.c				\
 	bitcoin/varint.c
@@ -22,6 +24,7 @@ BITCOIN_HEADERS := bitcoin/address.h		\
 	bitcoin/block.h				\
 	bitcoin/chainparams.h			\
 	bitcoin/feerate.h			\
+	bitcoin/groestl.h		\
 	bitcoin/locktime.h			\
 	bitcoin/preimage.h			\
 	bitcoin/privkey.h			\
@@ -31,6 +34,8 @@ BITCOIN_HEADERS := bitcoin/address.h		\
 	bitcoin/shadouble.h			\
 	bitcoin/short_channel_id.h		\
 	bitcoin/signature.h			\
+	bitcoin/sph_groestl.h		\
+	bitcoin/sph_types.h			\
 	bitcoin/tx.h				\
 	bitcoin/varint.h
 

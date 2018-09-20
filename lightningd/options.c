@@ -220,7 +220,7 @@ static char *opt_set_testnet(struct lightningd *ld)
 
 static char *opt_set_mainnet(struct lightningd *ld)
 {
-	return opt_set_network("bitcoin", ld);
+	return opt_set_network("groestlcoin", ld);
 }
 
 static void opt_show_network(char buf[OPT_SHOW_LEN],
@@ -329,14 +329,14 @@ static void config_register_opts(struct lightningd *ld)
 			 "Time after changes before sending out COMMIT");
 	opt_register_arg("--fee-base", opt_set_u32, opt_show_u32,
 			 &ld->config.fee_base,
-			 "Millisatoshi minimum to charge for HTLC");
+			 "Milligro minimum to charge for HTLC");
 	opt_register_arg("--rescan", opt_set_s32, opt_show_s32,
 			 &ld->config.rescan,
 			 "Number of blocks to rescan from the current head, or "
 			 "absolute blockheight if negative");
-	opt_register_arg("--fee-per-satoshi", opt_set_s32, opt_show_s32,
+	opt_register_arg("--fee-per-gro", opt_set_s32, opt_show_s32,
 			 &ld->config.fee_per_satoshi,
-			 "Microsatoshi fee for every satoshi in HTLC");
+			 "Microgro fee for every gro in HTLC");
 	opt_register_arg("--addr", opt_add_addr, NULL,
 			 ld,
 			 "Set an IP address (v4 or v6) to listen on and announce to the network for incoming connections");
@@ -355,13 +355,12 @@ static void config_register_opts(struct lightningd *ld)
 
 	opt_register_early_arg("--network", opt_set_network, opt_show_network,
 			       ld,
-			       "Select the network parameters (bitcoin, testnet,"
-			       " regtest, litecoin, litecoin-testnet, litecoin-regtest,"
-				   " groestlcoin, groestlcoin-testnet or groestlcoin-regtest)");
+			       "Select the network parameters ("
+				   " groestlcoin, testnet or regtest)");
 	opt_register_early_noarg("--testnet", opt_set_testnet, ld,
 				 "Alias for --network=testnet");
 	opt_register_early_noarg("--mainnet", opt_set_mainnet, ld,
-				 "Alias for --network=bitcoin");
+				 "Alias for --network=groestlcoin");
 	opt_register_early_arg("--allow-deprecated-apis",
 			       opt_set_bool_arg, opt_show_bool,
 			       &deprecated_apis,
@@ -434,13 +433,14 @@ static void dev_register_opts(struct lightningd *ld)
 }
 #endif
 
+
 static const struct config testnet_config = {
 	/* 6 blocks to catch cheating attempts. */
 	.locktime_blocks = 6,
 
 	/* They can have up to 14 days, maximumu value that lnd will ask for by default. */
 	/* FIXME Convince lnd to use more reasonable defaults... */
-	.locktime_max = 14 * 24 * 6,
+	.locktime_max = 14 * 24 * 60,
 
 	/* We're fairly trusting, under normal circumstances. */
 	.anchor_confirms = 1,
@@ -462,7 +462,7 @@ static const struct config testnet_config = {
 	/* Allow dust payments */
 	.fee_base = 1,
 	/* Take 0.001% */
-	.fee_per_satoshi = 10,
+	.fee_per_satoshi = 1,
 
 	/* BOLT #7:
 	 *
@@ -477,23 +477,23 @@ static const struct config testnet_config = {
 	/* Testnet sucks */
 	.ignore_fee_limits = true,
 
-	/* Rescan 5 hours of blocks on testnet, it's reorg happy */
-	.rescan = 30,
+	/* Rescan 1 hours of blocks on testnet, it's reorg happy */
+	.rescan = 60,
 
 	/* Fees may be in the range our_fee - 10*our_fee */
 	.max_fee_multiplier = 10,
 
-	.use_dns = true,
+	.use_dns = false,
 };
 
 /* aka. "Dude, where's my coins?" */
 static const struct config mainnet_config = {
 	/* ~one day to catch cheating attempts. */
-	.locktime_blocks = 6 * 24,
+	.locktime_blocks = 60 * 24 ,
 
 	/* They can have up to 14 days, maximumu value that lnd will ask for by default. */
 	/* FIXME Convince lnd to use more reasonable defaults... */
-	.locktime_max = 14 * 24 * 6,
+	.locktime_max = 14 * 24 * 60 ,
 
 	/* We're fairly trusting, under normal circumstances. */
 	.anchor_confirms = 3,
@@ -541,13 +541,16 @@ static const struct config mainnet_config = {
 	.ignore_fee_limits = false,
 
 	/* Rescan 2.5 hours of blocks on startup, it's not so reorg happy */
-	.rescan = 15,
+	.rescan = 150,
 
 	/* Fees may be in the range our_fee - 10*our_fee */
 	.max_fee_multiplier = 10,
 
-	.use_dns = true,
+	.use_dns = false,
 };
+
+
+
 
 static void check_config(struct lightningd *ld)
 {
@@ -568,10 +571,10 @@ static void check_config(struct lightningd *ld)
 
 static void setup_default_config(struct lightningd *ld)
 {
-	if (get_chainparams(ld)->testnet)
-		ld->config = testnet_config;
-	else
-		ld->config = mainnet_config;
+			if (get_chainparams(ld)->testnet)
+				ld->config = testnet_config;
+			else
+				ld->config = mainnet_config;
 
 	/* Set default PID file name to be per-network */
 	tal_free(ld->pidfile);
