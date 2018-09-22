@@ -78,7 +78,7 @@ int main(void)
 			     &testnet, &input_privkey, &inputkey))
 		abort();
 	/* regtest coinbase */
-	assert(!testnet); 
+	assert(!testnet);
 	printf("* Block 1 coinbase privkey: %s\n",
 	       type_to_string(tmpctx, struct privkey, &input_privkey));
 
