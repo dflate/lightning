@@ -110,7 +110,7 @@ def test_closing_while_disconnected(node_factory, bitcoind):
     l1.daemon.wait_for_log('sendrawtx exit 0')
     l2.daemon.wait_for_log('sendrawtx exit 0')
 
-    bitcoind.rpc.generate(101)
+    bitcoind.rpc.generate(121)
     wait_for(lambda: len(l1.rpc.listchannels()['channels']) == 0)
     wait_for(lambda: len(l2.rpc.listchannels()['channels']) == 0)
 
@@ -549,7 +549,7 @@ def test_onchaind_replay(node_factory, bitcoind):
 
     # Generate some blocks so we restart the onchaind from DB (we rescan
     # last_height - 100)
-    bitcoind.rpc.generate(100)
+    bitcoind.rpc.generate(121)
     sync_blockheight(bitcoind, [l1, l2])
 
     # l1 should still have a running onchaind
@@ -979,7 +979,7 @@ def test_onchain_different_fees(node_factory, bitcoind, executor):
     l1.daemon.wait_for_logs(['sendrawtx exit 0'] * 3)
 
     # Now, 100 blocks it should be done.
-    bitcoind.generate_block(100)
+    bitcoind.generate_block(121)
     wait_for(lambda: l1.rpc.listpeers()['peers'] == [])
     wait_for(lambda: l2.rpc.listpeers()['peers'] == [])
 
@@ -1017,7 +1017,7 @@ def test_permfail_new_commit(node_factory, bitcoind, executor):
     t.cancel()
 
     # Now, 100 blocks it should be done.
-    bitcoind.generate_block(100)
+    bitcoind.generate_block(121)
     wait_for(lambda: l1.rpc.listpeers()['peers'] == [])
     wait_for(lambda: l2.rpc.listpeers()['peers'] == [])
 
@@ -1197,7 +1197,7 @@ def test_permfail(node_factory, bitcoind):
     ])
 
     # Now, 100 blocks l2 should be done.
-    bitcoind.generate_block(5)
+    bitcoind.generate_block(100)
     wait_for(lambda: l2.rpc.listpeers()['peers'] == [])
 
     # Only l1 has a direct output since all of l2's outputs are respent (it

@@ -20,8 +20,8 @@
 #define SUPERVERBOSE(...)
 #endif
 
-/* 365.25 * 24 * 60 / 10 */
-#define BLOCKS_PER_YEAR 52596
+/* 365.25 * 24 * 60  Groestlcoin */
+#define BLOCKS_PER_YEAR 525960
 
 /* For overflow avoidance, we never deal with msatoshi > 40 bits. */
 #define MAX_MSATOSHI (1ULL << 40)
@@ -526,7 +526,7 @@ find_route(const tal_t *ctx, struct routing_state *rstate,
 	}
 
 	/* No route? */
-	if (dst->bfg[best].total >= INFINITE) {
+	if ((dst->bfg[best].total) >= INFINITE) {
 		status_trace("find_route: No route to %s",
 			     type_to_string(tmpctx, struct pubkey, to));
 		return NULL;

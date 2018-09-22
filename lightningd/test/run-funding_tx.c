@@ -66,18 +66,19 @@ int main(void)
 	 * Block 1 coinbase transaction: 01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff03510101ffffffff0100f2052a010000001976a9143ca33c2e4446f4a305f23c80df8ad1afdcf652f988ac00000000
 	 */
 	input = bitcoin_tx_from_hex(tmpctx,
-				    "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff03510101ffffffff0100f2052a010000001976a9143ca33c2e4446f4a305f23c80df8ad1afdcf652f988ac00000000",
-				    strlen("01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff03510101ffffffff0100f2052a010000001976a9143ca33c2e4446f4a305f23c80df8ad1afdcf652f988ac00000000"));
+				    "02000000010000000000000000000000000000000000000000000000000000000000000000ffffffff03510108ffffffff0200002cd6e21500002321034da56300c4211accc61b0546168a691fddec00cb0473f8e5b08a7b5ceea699eeac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf900000000",
+				    strlen("02000000010000000000000000000000000000000000000000000000000000000000000000ffffffff03510108ffffffff0200002cd6e21500002321034da56300c4211accc61b0546168a691fddec00cb0473f8e5b08a7b5ceea699eeac0000000000000000266a24aa21a9ede2f61c3f71d1defd3fa999dfa36953755c690689799962b48bebd836974e8cf900000000"));
 	assert(input);
 
 	/* BOLT #3:
 	 *    Block 1 coinbase privkey: 6bd078650fcee8444e4e09825227b801a1ca928debb750eb36e6d56124bb20e801
 	 *    # privkey in base58: cRCH7YNcarfvaiY1GWUKQrRGmoezvfAiqHtdRvxe16shzbd7LDMz
 	 */
-	if (!key_from_base58("cRCH7YNcarfvaiY1GWUKQrRGmoezvfAiqHtdRvxe16shzbd7LDMz", strlen("cRCH7YNcarfvaiY1GWUKQrRGmoezvfAiqHtdRvxe16shzbd7LDMz"),
+	if (!key_from_base58("L5ByerGLTFw6AR7BpxCFFgejDRZ71XkMZipQGfSSnSMVbtCqM7ue", strlen("L5ByerGLTFw6AR7BpxCFFgejDRZ71XkMZipQGfSSnSMVbtCqM7ue"),
 			     &testnet, &input_privkey, &inputkey))
 		abort();
-	assert(testnet);
+	/* regtest coinbase */
+	assert(!testnet);
 	printf("* Block 1 coinbase privkey: %s\n",
 	       type_to_string(tmpctx, struct privkey, &input_privkey));
 
@@ -99,7 +100,7 @@ int main(void)
 
 	bitcoin_txid(input, &utxo.txid);
 	utxo.outnum = 0;
-	utxo.amount = 5000000000;
+	utxo.amount = 24064000000000;
 	utxo.is_p2sh = false;
 	utxo.close_info = NULL;
 	funding_satoshis = 10000000;

@@ -35,7 +35,7 @@ with open('config.vars') as configfile:
     config = dict([(line.rstrip().split('=', 1)) for line in configfile])
 
 DEVELOPER = os.getenv("DEVELOPER", config['DEVELOPER']) == "1"
-TIMEOUT = int(os.getenv("TIMEOUT", "60"))
+TIMEOUT = int(os.getenv("TIMEOUT", "120"))
 VALGRIND = os.getenv("VALGRIND", config['VALGRIND']) == "1"
 
 
@@ -258,7 +258,7 @@ class BitcoinD(TailableProc):
             os.makedirs(regtestdir)
 
         self.cmd_line = [
-            'bitcoind',
+            'groestlcoind',
             '-datadir={}'.format(bitcoin_dir),
             '-printtoconsole',
             '-server',
@@ -270,7 +270,7 @@ class BitcoinD(TailableProc):
         # For after 0.16.1 (eg. 3f398d7a17f136cd4a67998406ca41a124ae2966), this
         # needs its own [regtest] section.
         BITCOIND_REGTEST = {'rpcport': rpcport}
-        btc_conf_file = os.path.join(bitcoin_dir, 'bitcoin.conf')
+        btc_conf_file = os.path.join(bitcoin_dir, 'groestlcoin.conf')
         write_config(btc_conf_file, BITCOIND_CONFIG, BITCOIND_REGTEST)
         self.rpc = SimpleBitcoinProxy(btc_conf_file=btc_conf_file)
 
@@ -382,7 +382,7 @@ class LightningNode(object):
             self.bitcoin.generate_block(1)
 
         if announce:
-            self.bitcoin.generate_block(5)
+            self.bitcoin.generate_block(6)
 
         if confirm or announce:
             self.daemon.wait_for_log(
@@ -741,7 +741,7 @@ class NodeFactory(object):
                 'valgrind',
                 '-q',
                 '--trace-children=yes',
-                '--trace-children-skip=*bitcoin-cli*',
+                '--trace-children-skip=*groestlcoin-cli*',
                 '--error-exitcode=7',
                 '--log-file={}/valgrind-errors.%p'.format(node.daemon.lightning_dir)
             ]
@@ -788,6 +788,8 @@ class NodeFactory(object):
             wait_for(lambda: src.channel_state(dst) == 'CHANNELD_NORMAL')
             scid = src.get_channel_scid(dst)
             src.daemon.wait_for_log(r'Received channel_update for channel {scid}\(.\) now ACTIVE'.format(scid=scid))
+
+        bitcoin.generate_block(1)
 
         if not announce:
             return nodes
