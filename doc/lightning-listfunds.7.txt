@@ -42,7 +42,7 @@ Each entry in 'channels' will include:
 - 'short_channel_id' - as per BOLT 7 (representing the block, transaction
 number and output index of the channel funding transaction).
 
-- 'channel_sat' - available satoshis on our node's end of the channel 
+- 'channel_sat' - available gro's on our node's end of the channel 
 (values rounded to the nearest gro as internal storage is in milligro).
 
 - 'channel_total_gro' -channel value in gro 
