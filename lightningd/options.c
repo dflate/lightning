@@ -694,7 +694,7 @@ static char *opt_lightningd_usage(struct lightningd *ld)
 	/* Reload config so that --help has the correct network defaults
 	 * to display before it exits */
 	setup_default_config(ld);
-	char *extra = tal_fmt(NULL, "\nA bitcoin lightning daemon (default "
+	char *extra = tal_fmt(NULL, "\nA groestlcoin lightning daemon (default "
 			"values shown for network: %s).",
 	                get_chainparams(ld)->network_name);
 	opt_usage_and_exit(extra);
@@ -714,7 +714,7 @@ void register_opts(struct lightningd *ld)
 
 	opt_register_arg("--bitcoin-datadir", opt_set_talstr, NULL,
 			 &ld->topology->bitcoind->datadir,
-			 "-datadir arg for bitcoin-cli");
+			 "-datadir arg for groestlcoin-cli");
 	opt_register_arg("--rgb", opt_set_rgb, NULL, ld,
 			 "RRGGBB hex color for node");
 	opt_register_arg("--alias", opt_set_alias, NULL, ld,
@@ -722,19 +722,19 @@ void register_opts(struct lightningd *ld)
 
 	opt_register_arg("--bitcoin-cli", opt_set_talstr, NULL,
 			 &ld->topology->bitcoind->cli,
-			 "bitcoin-cli pathname");
+			 "groestlcoin-cli pathname");
 	opt_register_arg("--bitcoin-rpcuser", opt_set_talstr, NULL,
 			 &ld->topology->bitcoind->rpcuser,
-			 "bitcoind RPC username");
+			 "groestlcoind RPC username");
 	opt_register_arg("--bitcoin-rpcpassword", opt_set_talstr, NULL,
 			 &ld->topology->bitcoind->rpcpass,
-			 "bitcoind RPC password");
+			 "groestlcoind RPC password");
 	opt_register_arg("--bitcoin-rpcconnect", opt_set_talstr, NULL,
 			 &ld->topology->bitcoind->rpcconnect,
-			 "bitcoind RPC host to connect to");
+			 "groestlcoind RPC host to connect to");
 	opt_register_arg("--bitcoin-rpcport", opt_set_talstr, NULL,
 			 &ld->topology->bitcoind->rpcport,
-			 "bitcoind RPC port");
+			 "groestlcoind RPC port");
 	opt_register_arg("--pid-file=<file>", opt_set_talstr, opt_show_charp,
 			 &ld->pidfile,
 			 "Specify pid file");
