@@ -131,7 +131,7 @@ Lightning node customization options:
 
 *fee-base*='MILLISATOSHI'::
     The base fee to charge for every payment which passes through.  Note that
-    millisatoshis are a very, very small unit!
+    milligro are a very, very small unit!
 
 *fee-per-gro*='MILLIONTHS'::
     This is the proportional fee to charge for every payment which passes
