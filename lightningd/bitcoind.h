@@ -31,10 +31,10 @@ enum bitcoind_prio {
 #define BITCOIND_NUM_PRIO (BITCOIND_HIGH_PRIO+1)
 
 struct bitcoind {
-	/* eg. "bitcoin-cli" */
+	/* eg. "groestlcoin-cli" */
 	char *cli;
 
-	/* -datadir arg for bitcoin-cli. */
+	/* -datadir arg for groestlcoin-cli. */
 	char *datadir;
 
 	/* Where to do logging. */
@@ -52,14 +52,14 @@ struct bitcoind {
 	/* What network are we on? */
 	const struct chainparams *chainparams;
 
-	/* If non-zero, time we first hit a bitcoind error. */
+	/* If non-zero, time we first hit a groestlcoind error. */
 	unsigned int error_count;
 	struct timemono first_error_time;
 
 	/* Ignore results, we're shutting down. */
 	bool shutdown;
 
-	/* Passthrough parameters for bitcoin-cli */
+	/* Passthrough parameters for groestlcoin-cli */
 	char *rpcuser, *rpcpass, *rpcconnect, *rpcport;
 };
 
