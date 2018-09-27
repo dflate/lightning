@@ -8,8 +8,8 @@ The long wait is over: the c-lightning team is excited to announce the 0.6 relea
 
 While there are far too many new features in the 0.6 release to list, the following are the most interesting and impactful:
 
- - __Lightweight nodes__: Previous releases required a full `bitcoind` node
-   running alongside c-lightning, to provide access to the Bitcoin network. This release still requires the `bitcoin-cli` utility to be present, but it
+ - __Lightweight nodes__: Previous releases required a full `groestlcoind` node
+   running alongside c-lightning, to provide access to the Groestlcoin network. This release still requires the `groestlcoin-cli` utility to be present, but it
    can now talk to remote nodes as well, including some lightweight nodes such
    as [`spruned`][spruned]. This makes it possible to run a c-lightning node on
    Raspberry Pis as well as other low-powered devices.
