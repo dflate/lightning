@@ -79,7 +79,7 @@ def bitcoind(directory):
 
     if info['version'] < 2160000:
         bitcoind.rpc.stop()
-        raise ValueError("bitcoind is too old. At least version (v2.16.0)"
+        raise ValueError("groestlcoind is too old. At least version 2160000 (v2.16.0)"
                          " is needed, current version is {}".format(info['version']))
 
     # Make sure we have some spendable funds

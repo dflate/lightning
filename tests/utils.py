@@ -278,7 +278,7 @@ class BitcoinD(TailableProc):
         TailableProc.start(self)
         self.wait_for_log("Done loading", timeout=TIMEOUT)
 
-        logging.info("BitcoinD started")
+        logging.info("GroestlcoinD started")
 
     def generate_block(self, numblocks=1):
         # As of 0.16, generate() is removed; use generatetoaddress.
