@@ -8,7 +8,7 @@ import re
 import shutil
 import sys
 import tempfile
-
+import time
 
 with open('config.vars') as configfile:
     config = dict([(line.rstrip().split('=', 1)) for line in configfile])
@@ -77,18 +77,23 @@ def bitcoind(directory):
 
     info = bitcoind.rpc.getnetworkinfo()
 
-    if info['version'] < 160000:
+    if info['version'] < 2160000:
         bitcoind.rpc.stop()
-        raise ValueError("bitcoind is too old. At least version 16000 (v0.16.0)"
+        raise ValueError("groestlcoind is too old. At least version 2160000 (v2.16.0)"
                          " is needed, current version is {}".format(info['version']))
 
-    info = bitcoind.rpc.getblockchaininfo()
     # Make sure we have some spendable funds
-    if info['blocks'] < 101:
-        bitcoind.generate_block(101 - info['blocks'])
-    elif bitcoind.rpc.getwalletinfo()['balance'] < 1:
-        logging.debug("Insufficient balance, generating 1 block")
+    bitcoind.generate_block(122)
+    start_time = time.time()
+    # 120 sec timeout
+    local_timeout = 120
+    while (bitcoind.rpc.getblockchaininfo()['blocks'] < 121) and time.time() < start_time + local_timeout:
         bitcoind.generate_block(1)
+
+    if bitcoind.rpc.getwalletinfo()['balance'] < 1:
+        logging.debug("Insufficient balance")
+        raise ValueError("groestlcoind error no funds from generate blocks")
+
 
     yield bitcoind
 

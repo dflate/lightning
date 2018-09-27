@@ -33,6 +33,7 @@ def test_pay(node_factory):
     # Repeat payments are NOPs (if valid): we can hand null.
     l1.rpc.pay(inv)
     # This won't work: can't provide an amount (even if correct!)
+
     with pytest.raises(RpcError):
         l1.rpc.pay(inv, 123000)
     with pytest.raises(RpcError):
@@ -41,7 +42,6 @@ def test_pay(node_factory):
     # Check pay_index is not null
     outputs = l2.db_query('SELECT pay_index IS NOT NULL AS q FROM invoices WHERE label="label";')
     assert len(outputs) == 1 and outputs[0]['q'] != 0
-
     # Check payment of any-amount invoice.
     for i in range(5):
         label = "any{}".format(i)
@@ -370,10 +370,10 @@ def test_sendpay(node_factory):
     # FIXME: test paying via another node, should fail to pay twice.
     p1 = l1.rpc.getpeer(l2.info['id'], 'info')
     p2 = l2.rpc.getpeer(l1.info['id'], 'info')
-    assert only_one(p1['channels'])['msatoshi_to_us'] == 10**6 * 1000
-    assert only_one(p1['channels'])['msatoshi_total'] == 10**6 * 1000
-    assert only_one(p2['channels'])['msatoshi_to_us'] == 0
-    assert only_one(p2['channels'])['msatoshi_total'] == 10**6 * 1000
+    assert only_one(p1['channels'])['mgro_to_us'] == 10**6 * 1000
+    assert only_one(p1['channels'])['mgro_total'] == 10**6 * 1000
+    assert only_one(p2['channels'])['mgro_to_us'] == 0
+    assert only_one(p2['channels'])['mgro_total'] == 10**6 * 1000
 
     # This works.
     before = int(time.time())
@@ -396,10 +396,10 @@ def test_sendpay(node_factory):
         p1 = l1.rpc.getpeer(l2.info['id'], 'info')
         p2 = l2.rpc.getpeer(l1.info['id'], 'info')
         return (
-            only_one(p1['channels'])['msatoshi_to_us'] == 10**6 * 1000 - amt and
-            only_one(p1['channels'])['msatoshi_total'] == 10**6 * 1000 and
-            only_one(p2['channels'])['msatoshi_to_us'] == amt and
-            only_one(p2['channels'])['msatoshi_total'] == 10**6 * 1000
+            only_one(p1['channels'])['mgro_to_us'] == 10**6 * 1000 - amt and
+            only_one(p1['channels'])['mgro_total'] == 10**6 * 1000 and
+            only_one(p2['channels'])['mgro_to_us'] == amt and
+            only_one(p2['channels'])['mgro_total'] == 10**6 * 1000
         )
     wait_for(check_balances)
 
@@ -498,19 +498,15 @@ def test_decodepay(node_factory):
     #   * `2pkx2ctnv5sxxmmwwd5kgetjypeh2ursdae8g6twvus8g6rfwvs8qun0dfjkxaq`: 'Please consider supporting this project'
     # * `32vjcgqxyuj7nqphl3xmmhls2rkl3t97uan4j0xa87gj5779czc8p0z58zf5wpt9ggem6adl64cvawcxlef9djqwp2jzzfvs272504sp`: signature
     # * `0lkg3c`: Bech32 checksum
-    b11 = l1.rpc.decodepay(
-        'lnbc1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqd'
-        'pl2pkx2ctnv5sxxmmwwd5kgetjypeh2ursdae8g6twvus8g6rfwvs8qun0dfjkxaq8rk'
-        'x3yf5tcsyz3d73gafnh3cax9rn449d9p5uxz9ezhhypd0elx87sjle52x86fux2ypatg'
-        'ddc6k63n7erqz25le42c4u4ecky03ylcqca784w'
-    )
-    assert b11['currency'] == 'bc'
+    b11 = l1.rpc.decodepay('lngrs1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdpl2pkx2ctnv5sxxmmwwd5kgetjypeh2ursdae8g6twvus8g6rfwvs8qun0dfjkxaqry7cu947rc3snaedmjtmauuslg0glcq6w7t9njkwxpql8zataj6jkcj02tcrskffaahc7570mjv50gt0nku23r8e30gazgndd50cucgplz6udt')
+
+    assert b11['currency'] == 'grs'
     assert b11['created_at'] == 1496314658
     assert b11['payment_hash'] == '0001020304050607080900010203040506070809000102030405060708090102'
     assert b11['description'] == 'Please consider supporting this project'
     assert b11['expiry'] == 3600
     assert b11['payee'] == '03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad'
-
+    
     # BOLT #11:
     # > ### Please send $3 for a cup of coffee to the same peer, within 1 minute
     # > lnbc2500u1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdq5xysxxatsyp3k7enxv4jsxqzpuaztrnwngzn3kdzw5hydlzf03qdgm2hdq27cqv3agm2awhz5se903vruatfhq77w3ls4evs3ch9zw97j25emudupq63nyw24cg27h2rspfj9srp
@@ -530,211 +526,18 @@ def test_decodepay(node_factory):
     #   * `pu`: 60 seconds (`p` = 1, `u` = 28.  1 * 32 + 28 == 60)
     # * `azh8qt5w7qeewkmxtv55khqxvdfs9zzradsvj7rcej9knpzdwjykcq8gv4v2dl705pjadhpsc967zhzdpuwn5qzjm0s4hqm2u0vuhhqq`: signature
     # * `7vc09u`: Bech32 checksum
-    b11 = l1.rpc.decodepay(
-        'lnbc2500u1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqf'
-        'qypqdq5xysxxatsyp3k7enxv4jsxqzpuaztrnwngzn3kdzw5hydlzf03qdgm2hdq27cq'
-        'v3agm2awhz5se903vruatfhq77w3ls4evs3ch9zw97j25emudupq63nyw24cg27h2rsp'
-        'fj9srp'
-    )
-    assert b11['currency'] == 'bc'
-    assert b11['msatoshi'] == 2500 * 10**11 // 1000000
+
+    b11 = l1.rpc.decodepay('lngrs2500u1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdq5xysxxatsyp3k7enxv4jsxqzpu9qesh2z5s6s0vjmq05mva9wp7l2pynjm2x3wf8zcj4kfa040wqzprsmyrdeuc8l7eemqt56r3srwvjetej72xdhnr4r74nellv7hlkgqqscvgy')
+
+    assert b11['currency'] == 'grs'
+    assert b11['msatoshi'] == 250000000
     assert b11['created_at'] == 1496314658
     assert b11['payment_hash'] == '0001020304050607080900010203040506070809000102030405060708090102'
     assert b11['description'] == '1 cup coffee'
     assert b11['expiry'] == 60
     assert b11['payee'] == '03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad'
 
-    # BOLT #11:
-    # > ### Now send $24 for an entire list of things (hashed)
-    # > lnbc20m1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqhp58yjmdan79s6qqdhdzgynm4zwqd5d7xmw5fk98klysy043l2ahrqscc6gd6ql3jrc5yzme8v4ntcewwz5cnw92tz0pc8qcuufvq7khhr8wpald05e92xw006sq94mg8v2ndf4sefvf9sygkshp5zfem29trqq2yxxz7
-    #
-    # Breakdown:
-    #
-    # * `lnbc`: prefix, lightning on bitcoin mainnet
-    # * `20m`: amount (20 milli-bitcoin)
-    # * `1`: Bech32 separator
-    # * `pvjluez`: timestamp (1496314658)
-    # * `p`: payment hash...
-    # * `h`: tagged field: hash of description
-    # * `p5`: `data_length` (`p` = 1, `5` = 20. 1 * 32 + 20 == 52)
-    # * `8yjmdan79s6qqdhdzgynm4zwqd5d7xmw5fk98klysy043l2ahrqs`: SHA256 of 'One piece of chocolate cake, one icecream cone, one pickle, one slice of swiss cheese, one slice of salami, one lollypop, one piece of cherry pie, one sausage, one cupcake, and one slice of watermelon'
-    # * `vjfls3ljx9e93jkw0kw40yxn4pevgzflf83qh2852esjddv4xk4z70nehrdcxa4fk0t6hlcc6vrxywke6njenk7yzkzw0quqcwxphkcp`: signature
-    # * `vam37w`: Bech32 checksum
-    b11 = l1.rpc.decodepay(
-        'lnbc20m1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqy'
-        'pqhp58yjmdan79s6qqdhdzgynm4zwqd5d7xmw5fk98klysy043l2ahrqscc6gd6ql3jr'
-        'c5yzme8v4ntcewwz5cnw92tz0pc8qcuufvq7khhr8wpald05e92xw006sq94mg8v2ndf'
-        '4sefvf9sygkshp5zfem29trqq2yxxz7',
-        'One piece of chocolate cake, one icecream cone, one pickle, one slic'
-        'e of swiss cheese, one slice of salami, one lollypop, one piece of c'
-        'herry pie, one sausage, one cupcake, and one slice of watermelon'
-    )
-    assert b11['currency'] == 'bc'
-    assert b11['msatoshi'] == 20 * 10**11 // 1000
-    assert b11['created_at'] == 1496314658
-    assert b11['payment_hash'] == '0001020304050607080900010203040506070809000102030405060708090102'
-    assert b11['expiry'] == 3600
-    assert b11['payee'] == '03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad'
-
-    # > ### The same, on testnet, with a fallback address mk2QpYatsKicvFVuTAQLBryyccRXMUaGHP
-    # > lntb20m1pvjluezhp58yjmdan79s6qqdhdzgynm4zwqd5d7xmw5fk98klysy043l2ahrqspp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqfpp3x9et2e20v6pu37c5d9vax37wxq72un98kmzzhznpurw9sgl2v0nklu2g4d0keph5t7tj9tcqd8rexnd07ux4uv2cjvcqwaxgj7v4uwn5wmypjd5n69z2xm3xgksg28nwht7f6zspwp3f9t
-    #
-    # Breakdown:
-    #
-    # * `lntb`: prefix, lightning on bitcoin testnet
-    # * `20m`: amount (20 milli-bitcoin)
-    # * `1`: Bech32 separator
-    # * `pvjluez`: timestamp (1496314658)
-    # * `p`: payment hash...
-    # * `f`: tagged field: fallback address
-    # * `pp`: `data_length` (`p` = 1. 1 * 32 + 1 == 33)
-    # * `3x9et2e20v6pu37c5d9vax37wxq72un98`: `3` = 17, so P2PKH address
-    # * `h`: tagged field: hash of description...
-    # * `qh84fmvn2klvglsjxfy0vq2mz6t9kjfzlxfwgljj35w2kwa60qv49k7jlsgx43yhs9nuutllkhhnt090mmenuhp8ue33pv4klmrzlcqp`: signature
-    # * `us2s2r`: Bech32 checksum
-    b11 = l1.rpc.decodepay(
-        'lntb20m1pvjluezhp58yjmdan79s6qqdhdzgynm4zwqd5d7xmw5fk98klysy043l2ahr'
-        'qspp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqfpp3x9et2e2'
-        '0v6pu37c5d9vax37wxq72un98kmzzhznpurw9sgl2v0nklu2g4d0keph5t7tj9tcqd8r'
-        'exnd07ux4uv2cjvcqwaxgj7v4uwn5wmypjd5n69z2xm3xgksg28nwht7f6zspwp3f9t',
-        'One piece of chocolate cake, one icecream cone, one pickle, one slic'
-        'e of swiss cheese, one slice of salami, one lollypop, one piece of c'
-        'herry pie, one sausage, one cupcake, and one slice of watermelon'
-    )
-    assert b11['currency'] == 'tb'
-    assert b11['msatoshi'] == 20 * 10**11 // 1000
-    assert b11['created_at'] == 1496314658
-    assert b11['payment_hash'] == '0001020304050607080900010203040506070809000102030405060708090102'
-    assert b11['expiry'] == 3600
-    assert b11['payee'] == '03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad'
-    assert len(b11['fallbacks']) == 1
-    assert b11['fallbacks'][0]['type'] == 'P2PKH'
-    assert b11['fallbacks'][0]['addr'] == 'mk2QpYatsKicvFVuTAQLBryyccRXMUaGHP'
-
-    # > ### On mainnet, with fallback address 1RustyRX2oai4EYYDpQGWvEL62BBGqN9T with extra routing info to go via nodes 029e03a901b85534ff1e92c43c74431f7ce72046060fcf7a95c37e148f78c77255 then 039e03a901b85534ff1e92c43c74431f7ce72046060fcf7a95c37e148f78c77255
-    # > lnbc20m1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqhp58yjmdan79s6qqdhdzgynm4zwqd5d7xmw5fk98klysy043l2ahrqsfpp3qjmp7lwpagxun9pygexvgpjdc4jdj85fr9yq20q82gphp2nflc7jtzrcazrra7wwgzxqc8u7754cdlpfrmccae92qgzqvzq2ps8pqqqqqqpqqqqq9qqqvpeuqafqxu92d8lr6fvg0r5gv0heeeqgcrqlnm6jhphu9y00rrhy4grqszsvpcgpy9qqqqqqgqqqqq7qqzqj9n4evl6mr5aj9f58zp6fyjzup6ywn3x6sk8akg5v4tgn2q8g4fhx05wf6juaxu9760yp46454gpg5mtzgerlzezqcqvjnhjh8z3g2qqdhhwkj
-    #
-    # Breakdown:
-    #
-    # * `lnbc`: prefix, lightning on bitcoin mainnet
-    # * `20m`: amount (20 milli-bitcoin)
-    # * `1`: Bech32 separator
-    # * `pvjluez`: timestamp (1496314658)
-    # * `p`: payment hash...
-    # * `h`: tagged field: hash of description...
-    # * `f`: tagged field: fallback address
-    #   * `pp`: `data_length` (`p` = 1. 1 * 32 + 1 == 33)
-    #   * `3` = 17, so P2PKH address
-    #   * `qjmp7lwpagxun9pygexvgpjdc4jdj85f`: 160 bit P2PKH address
-    # * `r`: tagged field: route information
-    #   * `9y`: `data_length` (`9` = 5, `y` = 4.  5 * 32 + 4 = 164)
-    #     `q20q82gphp2nflc7jtzrcazrra7wwgzxqc8u7754cdlpfrmccae92qgzqvzq2ps8pqqqqqqqqqqqq9qqqvpeuqafqxu92d8lr6fvg0r5gv0heeeqgcrqlnm6jhphu9y00rrhy4grqszsvpcgpy9qqqqqqqqqqqq7qqzq`: pubkey `029e03a901b85534ff1e92c43c74431f7ce72046060fcf7a95c37e148f78c77255`, `short_channel_id` 0102030405060708, `fee_base_msat` 1 millisatoshi, `fee_proportional_millionths` 20, `cltv_expiry_delta` 3.  pubkey `039e03a901b85534ff1e92c43c74431f7ce72046060fcf7a95c37e148f78c77255`, `short_channel_id` 030405060708090a, `fee_base_msat` 2 millisatoshi, `fee_proportional_millionths` 30, `cltv_expiry_delta` 4.
-    # * `j9n4evl6mr5aj9f58zp6fyjzup6ywn3x6sk8akg5v4tgn2q8g4fhx05wf6juaxu9760yp46454gpg5mtzgerlzezqcqvjnhjh8z3g2qq`: signature
-    # * `dhhwkj`: Bech32 checksum
-    b11 = l1.rpc.decodepay('lnbc20m1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqhp58yjmdan79s6qqdhdzgynm4zwqd5d7xmw5fk98klysy043l2ahrqsfpp3qjmp7lwpagxun9pygexvgpjdc4jdj85fr9yq20q82gphp2nflc7jtzrcazrra7wwgzxqc8u7754cdlpfrmccae92qgzqvzq2ps8pqqqqqqpqqqqq9qqqvpeuqafqxu92d8lr6fvg0r5gv0heeeqgcrqlnm6jhphu9y00rrhy4grqszsvpcgpy9qqqqqqgqqqqq7qqzqj9n4evl6mr5aj9f58zp6fyjzup6ywn3x6sk8akg5v4tgn2q8g4fhx05wf6juaxu9760yp46454gpg5mtzgerlzezqcqvjnhjh8z3g2qqdhhwkj', 'One piece of chocolate cake, one icecream cone, one pickle, one slice of swiss cheese, one slice of salami, one lollypop, one piece of cherry pie, one sausage, one cupcake, and one slice of watermelon')
-    assert b11['currency'] == 'bc'
-    assert b11['msatoshi'] == 20 * 10**11 // 1000
-    assert b11['created_at'] == 1496314658
-    assert b11['payment_hash'] == '0001020304050607080900010203040506070809000102030405060708090102'
-    assert b11['expiry'] == 3600
-    assert b11['payee'] == '03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad'
-    assert len(b11['fallbacks']) == 1
-    assert b11['fallbacks'][0]['type'] == 'P2PKH'
-    assert b11['fallbacks'][0]['addr'] == '1RustyRX2oai4EYYDpQGWvEL62BBGqN9T'
-    assert len(b11['routes']) == 1
-    assert len(b11['routes'][0]) == 2
-    assert b11['routes'][0][0]['pubkey'] == '029e03a901b85534ff1e92c43c74431f7ce72046060fcf7a95c37e148f78c77255'
-    # 0x010203:0x040506:0x0708
-    assert b11['routes'][0][0]['short_channel_id'] == '66051:263430:1800'
-    assert b11['routes'][0][0]['fee_base_msat'] == 1
-    assert b11['routes'][0][0]['fee_proportional_millionths'] == 20
-    assert b11['routes'][0][0]['cltv_expiry_delta'] == 3
-
-    assert b11['routes'][0][1]['pubkey'] == '039e03a901b85534ff1e92c43c74431f7ce72046060fcf7a95c37e148f78c77255'
-    # 0x030405:0x060708:0x090a
-    assert b11['routes'][0][1]['short_channel_id'] == '197637:395016:2314'
-    assert b11['routes'][0][1]['fee_base_msat'] == 2
-    assert b11['routes'][0][1]['fee_proportional_millionths'] == 30
-    assert b11['routes'][0][1]['cltv_expiry_delta'] == 4
-
-    # > ### On mainnet, with fallback (P2SH) address 3EktnHQD7RiAE6uzMj2ZifT9YgRrkSgzQX
-    # > lnbc20m1pvjluezhp58yjmdan79s6qqdhdzgynm4zwqd5d7xmw5fk98klysy043l2ahrqspp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqfppj3a24vwu6r8ejrss3axul8rxldph2q7z9kmrgvr7xlaqm47apw3d48zm203kzcq357a4ls9al2ea73r8jcceyjtya6fu5wzzpe50zrge6ulk4nvjcpxlekvmxl6qcs9j3tz0469gq5g658y
-    #
-    # Breakdown:
-    #
-    # * `lnbc`: prefix, lightning on bitcoin mainnet
-    # * `20m`: amount (20 milli-bitcoin)
-    # * `1`: Bech32 separator
-    # * `pvjluez`: timestamp (1496314658)
-    # * `p`: payment hash...
-    # * `f`: tagged field: fallback address.
-    # * `pp`: `data_length` (`p` = 1. 1 * 32 + 1 == 33)
-    # * `j3a24vwu6r8ejrss3axul8rxldph2q7z9`: `j` = 18, so P2SH address
-    # * `h`: tagged field: hash of description...
-    # * `2jhz8j78lv2jynuzmz6g8ve53he7pheeype33zlja5azae957585uu7x59w0f2l3rugyva6zpu394y4rh093j6wxze0ldsvk757a9msq`: signature
-    # * `mf9swh`: Bech32 checksum
-    b11 = l1.rpc.decodepay('lnbc20m1pvjluezhp58yjmdan79s6qqdhdzgynm4zwqd5d7xmw5fk98klysy043l2ahrqspp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqfppj3a24vwu6r8ejrss3axul8rxldph2q7z9kmrgvr7xlaqm47apw3d48zm203kzcq357a4ls9al2ea73r8jcceyjtya6fu5wzzpe50zrge6ulk4nvjcpxlekvmxl6qcs9j3tz0469gq5g658y', 'One piece of chocolate cake, one icecream cone, one pickle, one slice of swiss cheese, one slice of salami, one lollypop, one piece of cherry pie, one sausage, one cupcake, and one slice of watermelon')
-    assert b11['currency'] == 'bc'
-    assert b11['msatoshi'] == 20 * 10**11 // 1000
-    assert b11['created_at'] == 1496314658
-    assert b11['payment_hash'] == '0001020304050607080900010203040506070809000102030405060708090102'
-    assert b11['expiry'] == 3600
-    assert b11['payee'] == '03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad'
-    assert len(b11['fallbacks']) == 1
-    assert b11['fallbacks'][0]['type'] == 'P2SH'
-    assert b11['fallbacks'][0]['addr'] == '3EktnHQD7RiAE6uzMj2ZifT9YgRrkSgzQX'
-
-    # > ### On mainnet, with fallback (P2WPKH) address bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4
-    # > lnbc20m1pvjluezhp58yjmdan79s6qqdhdzgynm4zwqd5d7xmw5fk98klysy043l2ahrqspp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqfppqw508d6qejxtdg4y5r3zarvary0c5xw7kepvrhrm9s57hejg0p662ur5j5cr03890fa7k2pypgttmh4897d3raaq85a293e9jpuqwl0rnfuwzam7yr8e690nd2ypcq9hlkdwdvycqa0qza8
-    #
-    # * `lnbc`: prefix, lightning on bitcoin mainnet
-    # * `20m`: amount (20 milli-bitcoin)
-    # * `1`: Bech32 separator
-    # * `pvjluez`: timestamp (1496314658)
-    # * `p`: payment hash...
-    # * `f`: tagged field: fallback address.
-    # * `pp`: `data_length` (`p` = 1. 1 * 32 + 1 == 33)
-    # * `q`: 0, so witness version 0.
-    # * `qw508d6qejxtdg4y5r3zarvary0c5xw7k`: 160 bits = P2WPKH.
-    # * `h`: tagged field: hash of description...
-    # * `gw6tk8z0p0qdy9ulggx65lvfsg3nxxhqjxuf2fvmkhl9f4jc74gy44d5ua9us509prqz3e7vjxrftn3jnk7nrglvahxf7arye5llphgq`: signature
-    # * `qdtpa4`: Bech32 checksum
-    b11 = l1.rpc.decodepay('lnbc20m1pvjluezhp58yjmdan79s6qqdhdzgynm4zwqd5d7xmw5fk98klysy043l2ahrqspp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqfppqw508d6qejxtdg4y5r3zarvary0c5xw7kepvrhrm9s57hejg0p662ur5j5cr03890fa7k2pypgttmh4897d3raaq85a293e9jpuqwl0rnfuwzam7yr8e690nd2ypcq9hlkdwdvycqa0qza8', 'One piece of chocolate cake, one icecream cone, one pickle, one slice of swiss cheese, one slice of salami, one lollypop, one piece of cherry pie, one sausage, one cupcake, and one slice of watermelon')
-    assert b11['currency'] == 'bc'
-    assert b11['msatoshi'] == 20 * 10**11 // 1000
-    assert b11['created_at'] == 1496314658
-    assert b11['payment_hash'] == '0001020304050607080900010203040506070809000102030405060708090102'
-    assert b11['expiry'] == 3600
-    assert b11['payee'] == '03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad'
-    assert len(b11['fallbacks']) == 1
-    assert b11['fallbacks'][0]['type'] == 'P2WPKH'
-    assert b11['fallbacks'][0]['addr'] == 'bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4'
-
-    # > ### On mainnet, with fallback (P2WSH) address bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3
-    # > lnbc20m1pvjluezhp58yjmdan79s6qqdhdzgynm4zwqd5d7xmw5fk98klysy043l2ahrqspp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqfp4qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3q28j0v3rwgy9pvjnd48ee2pl8xrpxysd5g44td63g6xcjcu003j3qe8878hluqlvl3km8rm92f5stamd3jw763n3hck0ct7p8wwj463cql26ava
-    #
-    # * `lnbc`: prefix, lightning on bitcoin mainnet
-    # * `20m`: amount (20 milli-bitcoin)
-    # * `1`: Bech32 separator
-    # * `pvjluez`: timestamp (1496314658)
-    # * `p`: payment hash...
-    # * `f`: tagged field: fallback address.
-    # * `p4`: `data_length` (`p` = 1, `4` = 21. 1 * 32 + 21 == 53)
-    # * `q`: 0, so witness version 0.
-    # * `rp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3q`: 260 bits = P2WSH.
-    # * `h`: tagged field: hash of description...
-    # * `5yps56lmsvgcrf476flet6js02m93kgasews8q3jhtp7d6cqckmh70650maq4u65tk53ypszy77v9ng9h2z3q3eqhtc3ewgmmv2grasp`: signature
-    # * `akvd7y`: Bech32 checksum
-    b11 = l1.rpc.decodepay('lnbc20m1pvjluezhp58yjmdan79s6qqdhdzgynm4zwqd5d7xmw5fk98klysy043l2ahrqspp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqfp4qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3q28j0v3rwgy9pvjnd48ee2pl8xrpxysd5g44td63g6xcjcu003j3qe8878hluqlvl3km8rm92f5stamd3jw763n3hck0ct7p8wwj463cql26ava', 'One piece of chocolate cake, one icecream cone, one pickle, one slice of swiss cheese, one slice of salami, one lollypop, one piece of cherry pie, one sausage, one cupcake, and one slice of watermelon')
-    assert b11['currency'] == 'bc'
-    assert b11['msatoshi'] == 20 * 10**11 // 1000
-    assert b11['created_at'] == 1496314658
-    assert b11['payment_hash'] == '0001020304050607080900010203040506070809000102030405060708090102'
-    assert b11['expiry'] == 3600
-    assert b11['payee'] == '03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad'
-    assert len(b11['fallbacks']) == 1
-    assert b11['fallbacks'][0]['type'] == 'P2WSH'
-    assert b11['fallbacks'][0]['addr'] == 'bc1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qccfmv3'
+    # FIXME ADD MORE TESTS
 
     with pytest.raises(RpcError):
         l1.rpc.decodepay('1111111')
@@ -920,7 +723,7 @@ def test_forward_different_fees_and_cltv(node_factory, bitcoind):
                            .format(bitcoind.rpc.getblockcount() + 20 + 9 + shadow_route))
     l2.daemon.wait_for_log("Adding HTLC 0 msat=4999999 cltv={} gave CHANNEL_ERR_ADD_OK"
                            .format(bitcoind.rpc.getblockcount() + 9 + shadow_route))
-    l3.daemon.wait_for_log("test_forward_different_fees_and_cltv: Actual amount 4999999msat, HTLC expiry {}"
+    l3.daemon.wait_for_log("test_forward_different_fees_and_cltv: Actual amount 4999999mgro, HTLC expiry {}"
                            .format(bitcoind.rpc.getblockcount() + 9 + shadow_route))
     assert only_one(l3.rpc.listinvoices('test_forward_different_fees_and_cltv')['invoices'])['status'] == 'paid'
 

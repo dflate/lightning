@@ -8,6 +8,7 @@
 #include <bitcoin/preimage.h>
 #include <bitcoin/privkey.h>
 #include <bitcoin/pubkey.h>
+#include <bitcoin/tx.h>
 #include <ccan/err/err.h>
 #include <ccan/str/hex/hex.h>
 #include <common/sphinx.h>
@@ -144,7 +145,7 @@ static const struct htlc **include_htlcs(struct channel *channel, enum side side
 		memset(&preimage, i, sizeof(preimage));
 		sha256(&hash, &preimage, sizeof(preimage));
 		e = channel_add_htlc(channel, sender, i, msatoshi, 500+i, &hash,
-				     dummy_routing, NULL);
+					 dummy_routing, NULL);
 		assert(e == CHANNEL_ERR_ADD_OK);
 		htlcs[i] = channel_get_htlc(channel, sender, i);
 	}
@@ -190,24 +191,24 @@ static void tx_must_be_eq(const struct bitcoin_tx *a,
 	for (i = 0; i < tal_count(lina); i++) {
 		if (i >= tal_count(linb))
 			errx(1, "Second tx is truncated:\n"
-			     "%s\n"
-			     "%s",
-			     tal_hex(tmpctx, lina),
-			     tal_hex(tmpctx, linb));
+				 "%s\n"
+				 "%s",
+				 tal_hex(tmpctx, lina),
+				 tal_hex(tmpctx, linb));
 		if (lina[i] != linb[i])
 			errx(1, "tx differ at offset %zu:\n"
-			     "%s\n"
-			     "%s",
-			     i,
-			     tal_hex(tmpctx, lina),
-			     tal_hex(tmpctx, linb));
+				 "%s\n"
+				 "%s",
+				 i,
+				 tal_hex(tmpctx, lina),
+				 tal_hex(tmpctx, linb));
 	}
 	if (i != tal_count(linb))
 		errx(1, "First tx is truncated:\n"
-		     "%s\n"
-		     "%s",
-		     tal_hex(tmpctx, lina),
-		     tal_hex(tmpctx, linb));
+			 "%s\n"
+			 "%s",
+			 tal_hex(tmpctx, lina),
+			 tal_hex(tmpctx, linb));
 }
 
 static void txs_must_be_eq(struct bitcoin_tx **a, struct bitcoin_tx **b)
@@ -216,7 +217,7 @@ static void txs_must_be_eq(struct bitcoin_tx **a, struct bitcoin_tx **b)
 
 	if (tal_count(a) != tal_count(b))
 		errx(1, "A has %zu txs, B has %zu",
-		     tal_count(a), tal_count(b));
+			 tal_count(a), tal_count(b));
 
 	for (i = 0; i < tal_count(a); i++)
 		tx_must_be_eq(a[i], b[i]);
@@ -251,7 +252,7 @@ static void send_and_fulfill_htlc(struct channel *channel,
 		ret = channel_sending_revoke_and_ack(channel);
 		assert(!ret);
 		assert(channel_fulfill_htlc(channel, LOCAL, 1337, &r, NULL)
-		       == CHANNEL_ERR_REMOVE_OK);
+			   == CHANNEL_ERR_REMOVE_OK);
 		ret = channel_rcvd_commit(channel, &changed_htlcs);
 		assert(ret);
 		ret = channel_sending_revoke_and_ack(channel);
@@ -261,7 +262,7 @@ static void send_and_fulfill_htlc(struct channel *channel,
 		ret = channel_rcvd_revoke_and_ack(channel, &changed_htlcs);
 		assert(!ret);
 		assert(channel_get_htlc(channel, sender, 1337)->state
-		       == RCVD_REMOVE_ACK_REVOCATION);
+			   == RCVD_REMOVE_ACK_REVOCATION);
 	} else {
 		ret = channel_rcvd_commit(channel, &changed_htlcs);
 		assert(ret);
@@ -272,7 +273,7 @@ static void send_and_fulfill_htlc(struct channel *channel,
 		ret = channel_rcvd_revoke_and_ack(channel, &changed_htlcs);
 		assert(!ret);
 		assert(channel_fulfill_htlc(channel, REMOTE, 1337, &r, NULL)
-		       == CHANNEL_ERR_REMOVE_OK);
+			   == CHANNEL_ERR_REMOVE_OK);
 		ret = channel_sending_commit(channel, &changed_htlcs);
 		assert(ret);
 		ret = channel_rcvd_revoke_and_ack(channel, &changed_htlcs);
@@ -282,7 +283,7 @@ static void send_and_fulfill_htlc(struct channel *channel,
 		ret = channel_sending_revoke_and_ack(channel);
 		assert(!ret);
 		assert(channel_get_htlc(channel, sender, 1337)->state
-		       == SENT_REMOVE_ACK_REVOCATION);
+			   == SENT_REMOVE_ACK_REVOCATION);
 	}
 }
 
@@ -336,7 +337,7 @@ int main(void)
 	const struct htlc **htlc_map, **htlcs;
 	const u8 *funding_wscript, **wscripts;
 	size_t i;
-	const struct chainparams *chainparams = chainparams_for_network("bitcoin");
+	const struct chainparams *chainparams = chainparams_for_network("groestlcoin");
 
 	secp256k1_ctx = wally_get_secp_context();
 	setup_tmpctx();
@@ -445,27 +446,27 @@ int main(void)
 	to_remote_msat = 3000000000;
 	feerate_per_kw[LOCAL] = feerate_per_kw[REMOTE] = 15000;
 	lchannel = new_full_channel(tmpctx,
-				    &chainparams->genesis_blockhash,
-				    &funding_txid, funding_output_index,
-				    funding_amount_satoshi, to_local_msat,
-				    feerate_per_kw,
-				    local_config,
-				    remote_config,
-				    &localbase, &remotebase,
-				    &local_funding_pubkey,
-				    &remote_funding_pubkey,
-				    LOCAL);
+					&chainparams->genesis_blockhash,
+					&funding_txid, funding_output_index,
+					funding_amount_satoshi, to_local_msat,
+					feerate_per_kw,
+					local_config,
+					remote_config,
+					&localbase, &remotebase,
+					&local_funding_pubkey,
+					&remote_funding_pubkey,
+					LOCAL);
 	rchannel = new_full_channel(tmpctx,
-				    &chainparams->genesis_blockhash,
-				    &funding_txid, funding_output_index,
-				    funding_amount_satoshi, to_remote_msat,
-				    feerate_per_kw,
-				    remote_config,
-				    local_config,
-				    &remotebase, &localbase,
-				    &remote_funding_pubkey,
-				    &local_funding_pubkey,
-				    REMOTE);
+					&chainparams->genesis_blockhash,
+					&funding_txid, funding_output_index,
+					funding_amount_satoshi, to_remote_msat,
+					feerate_per_kw,
+					remote_config,
+					local_config,
+					&remotebase, &localbase,
+					&remote_funding_pubkey,
+					&local_funding_pubkey,
+					REMOTE);
 
 	/* BOLT #3:
 	 *
@@ -496,7 +497,6 @@ int main(void)
 			   to_local_msat,
 			   to_remote_msat,
 			   NULL, &htlc_map, 0x2bb038521914 ^ 42, LOCAL);
-
 	txs = channel_txs(tmpctx, &htlc_map, &wscripts,
 			  lchannel, &local_per_commitment_point, 42, LOCAL);
 	assert(tal_count(txs) == 1);
@@ -528,9 +528,9 @@ int main(void)
 	send_and_fulfill_htlc(rchannel, REMOTE, 7000000);
 
 	assert(lchannel->view[LOCAL].owed_msat[LOCAL]
-	       == rchannel->view[REMOTE].owed_msat[REMOTE]);
+		   == rchannel->view[REMOTE].owed_msat[REMOTE]);
 	assert(lchannel->view[REMOTE].owed_msat[REMOTE]
-	       == rchannel->view[LOCAL].owed_msat[LOCAL]);
+		   == rchannel->view[LOCAL].owed_msat[LOCAL]);
 
 	txs = channel_txs(tmpctx, &htlc_map, &wscripts,
 			  lchannel, &local_per_commitment_point, 42, LOCAL);
@@ -546,9 +546,9 @@ int main(void)
 	include_htlcs(rchannel, REMOTE);
 
 	assert(lchannel->view[LOCAL].owed_msat[LOCAL]
-	       == rchannel->view[REMOTE].owed_msat[REMOTE]);
+		   == rchannel->view[REMOTE].owed_msat[REMOTE]);
 	assert(lchannel->view[REMOTE].owed_msat[REMOTE]
-	       == rchannel->view[LOCAL].owed_msat[LOCAL]);
+		   == rchannel->view[LOCAL].owed_msat[LOCAL]);
 
 	txs = channel_txs(tmpctx, &htlc_map, &wscripts,
 			  lchannel, &local_per_commitment_point, 42, LOCAL);
@@ -557,12 +557,13 @@ int main(void)
 			   rchannel, &local_per_commitment_point, 42, REMOTE);
 	txs_must_be_eq(txs, txs2);
 
-	/* FIXME: Compare signatures! */
+	/* FIXME: Compare signatures! GROESTLCOIN FIND OTHER HTLC TESTCASES */
 	/* BOLT #3:
 	 *
 	 *     output htlc_success_tx 0: 020000000001018154ecccf11a5fb56c39654c4deb4d2296f83c69268280b94d021370c94e219700000000000000000001e8030000000000002200204adb4e2f00643db396dd120d4e7dc17625f5f2c11a40d857accc862d6b7dd80e050047304402206a6e59f18764a5bf8d4fa45eebc591566689441229c918b480fb2af8cc6a4aeb02205248f273be447684b33e3c8d1d85a8e0ca9fa0bae9ae33f0527ada9c162919a60147304402207cb324fa0de88f452ffa9389678127ebcf4cabe1dd848b8e076c1a1962bf34720220116ed922b12311bd602d67e60d2529917f21c5b82f25ff6506c0f87886b4dfd5012000000000000000000000000000000000000000000000000000000000000000008a76a91414011f7254d96b819c76986c277d115efce6f7b58763ac67210394854aa6eab5b2a8122cc726e9dded053a2184d88256816826d6231c068d4a5b7c8201208763a914b8bcb07f6344b42ab04250c86a6e8b75d3fdbbc688527c21030d417a46946384f88d5f3337267c5e579765875dc4daca813e21734b140639e752ae677502f401b175ac686800000000
 	 */
-	raw_tx = tx_from_hex(tmpctx, "020000000001018154ecccf11a5fb56c39654c4deb4d2296f83c69268280b94d021370c94e219700000000000000000001e8030000000000002200204adb4e2f00643db396dd120d4e7dc17625f5f2c11a40d857accc862d6b7dd80e050047304402206a6e59f18764a5bf8d4fa45eebc591566689441229c918b480fb2af8cc6a4aeb02205248f273be447684b33e3c8d1d85a8e0ca9fa0bae9ae33f0527ada9c162919a60147304402207cb324fa0de88f452ffa9389678127ebcf4cabe1dd848b8e076c1a1962bf34720220116ed922b12311bd602d67e60d2529917f21c5b82f25ff6506c0f87886b4dfd5012000000000000000000000000000000000000000000000000000000000000000008a76a91414011f7254d96b819c76986c277d115efce6f7b58763ac67210394854aa6eab5b2a8122cc726e9dded053a2184d88256816826d6231c068d4a5b7c8201208763a914b8bcb07f6344b42ab04250c86a6e8b75d3fdbbc688527c21030d417a46946384f88d5f3337267c5e579765875dc4daca813e21734b140639e752ae677502f401b175ac686800000000");
+
+	raw_tx = tx_from_hex(tmpctx, "02000000017f6162d60bf6e3da6a03cf62e6b705b9234a9497aeae77075f0db54fc990a8aa00000000000000000001e8030000000000002200204adb4e2f00643db396dd120d4e7dc17625f5f2c11a40d857accc862d6b7dd80e00000000");
 	raw_tx->input[0].witness = NULL;
 	tx_must_be_eq(raw_tx, txs[1]);
 
@@ -570,31 +571,37 @@ int main(void)
 	 *
 	 *     output htlc_timeout_tx 2: 020000000001018154ecccf11a5fb56c39654c4deb4d2296f83c69268280b94d021370c94e219701000000000000000001d0070000000000002200204adb4e2f00643db396dd120d4e7dc17625f5f2c11a40d857accc862d6b7dd80e0500483045022100d5275b3619953cb0c3b5aa577f04bc512380e60fa551762ce3d7a1bb7401cff9022037237ab0dac3fe100cde094e82e2bed9ba0ed1bb40154b48e56aa70f259e608b01483045022100c89172099507ff50f4c925e6c5150e871fb6e83dd73ff9fbb72f6ce829a9633f02203a63821d9162e99f9be712a68f9e589483994feae2661e4546cd5b6cec007be501008576a91414011f7254d96b819c76986c277d115efce6f7b58763ac67210394854aa6eab5b2a8122cc726e9dded053a2184d88256816826d6231c068d4a5b7c820120876475527c21030d417a46946384f88d5f3337267c5e579765875dc4daca813e21734b140639e752ae67a914b43e1b38138a41b37f7cd9a1d274bc63e3a9b5d188ac6868f6010000
 	 */
-	raw_tx = tx_from_hex(tmpctx, "020000000001018154ecccf11a5fb56c39654c4deb4d2296f83c69268280b94d021370c94e219701000000000000000001d0070000000000002200204adb4e2f00643db396dd120d4e7dc17625f5f2c11a40d857accc862d6b7dd80e0500483045022100d5275b3619953cb0c3b5aa577f04bc512380e60fa551762ce3d7a1bb7401cff9022037237ab0dac3fe100cde094e82e2bed9ba0ed1bb40154b48e56aa70f259e608b01483045022100c89172099507ff50f4c925e6c5150e871fb6e83dd73ff9fbb72f6ce829a9633f02203a63821d9162e99f9be712a68f9e589483994feae2661e4546cd5b6cec007be501008576a91414011f7254d96b819c76986c277d115efce6f7b58763ac67210394854aa6eab5b2a8122cc726e9dded053a2184d88256816826d6231c068d4a5b7c820120876475527c21030d417a46946384f88d5f3337267c5e579765875dc4daca813e21734b140639e752ae67a914b43e1b38138a41b37f7cd9a1d274bc63e3a9b5d188ac6868f6010000");
+
+
+	raw_tx = tx_from_hex(tmpctx, "02000000017f6162d60bf6e3da6a03cf62e6b705b9234a9497aeae77075f0db54fc990a8aa01000000000000000001d0070000000000002200204adb4e2f00643db396dd120d4e7dc17625f5f2c11a40d857accc862d6b7dd80ef6010000");
 	raw_tx->input[0].witness = NULL;
 	tx_must_be_eq(raw_tx, txs[2]);
+
 
 	/* BOLT #3:
 	 *
 	 *     output htlc_success_tx 1: 020000000001018154ecccf11a5fb56c39654c4deb4d2296f83c69268280b94d021370c94e219702000000000000000001d0070000000000002200204adb4e2f00643db396dd120d4e7dc17625f5f2c11a40d857accc862d6b7dd80e050047304402201b63ec807771baf4fdff523c644080de17f1da478989308ad13a58b51db91d360220568939d38c9ce295adba15665fa68f51d967e8ed14a007b751540a80b325f20201483045022100def389deab09cee69eaa1ec14d9428770e45bcbe9feb46468ecf481371165c2f022015d2e3c46600b2ebba8dcc899768874cc6851fd1ecb3fffd15db1cc3de7e10da012001010101010101010101010101010101010101010101010101010101010101018a76a91414011f7254d96b819c76986c277d115efce6f7b58763ac67210394854aa6eab5b2a8122cc726e9dded053a2184d88256816826d6231c068d4a5b7c8201208763a9144b6b2e5444c2639cc0fb7bcea5afba3f3cdce23988527c21030d417a46946384f88d5f3337267c5e579765875dc4daca813e21734b140639e752ae677502f501b175ac686800000000
 	 */
-	raw_tx = tx_from_hex(tmpctx, "020000000001018154ecccf11a5fb56c39654c4deb4d2296f83c69268280b94d021370c94e219702000000000000000001d0070000000000002200204adb4e2f00643db396dd120d4e7dc17625f5f2c11a40d857accc862d6b7dd80e050047304402201b63ec807771baf4fdff523c644080de17f1da478989308ad13a58b51db91d360220568939d38c9ce295adba15665fa68f51d967e8ed14a007b751540a80b325f20201483045022100def389deab09cee69eaa1ec14d9428770e45bcbe9feb46468ecf481371165c2f022015d2e3c46600b2ebba8dcc899768874cc6851fd1ecb3fffd15db1cc3de7e10da012001010101010101010101010101010101010101010101010101010101010101018a76a91414011f7254d96b819c76986c277d115efce6f7b58763ac67210394854aa6eab5b2a8122cc726e9dded053a2184d88256816826d6231c068d4a5b7c8201208763a9144b6b2e5444c2639cc0fb7bcea5afba3f3cdce23988527c21030d417a46946384f88d5f3337267c5e579765875dc4daca813e21734b140639e752ae677502f501b175ac686800000000");
+	raw_tx = tx_from_hex(tmpctx, "02000000017f6162d60bf6e3da6a03cf62e6b705b9234a9497aeae77075f0db54fc990a8aa02000000000000000001d0070000000000002200204adb4e2f00643db396dd120d4e7dc17625f5f2c11a40d857accc862d6b7dd80e00000000");
 	raw_tx->input[0].witness = NULL;
 	tx_must_be_eq(raw_tx, txs[3]);
+
+
 
 	/* BOLT #3:
 	 *
 	 *     output htlc_timeout_tx 3: 020000000001018154ecccf11a5fb56c39654c4deb4d2296f83c69268280b94d021370c94e219703000000000000000001b80b0000000000002200204adb4e2f00643db396dd120d4e7dc17625f5f2c11a40d857accc862d6b7dd80e0500483045022100daee1808f9861b6c3ecd14f7b707eca02dd6bdfc714ba2f33bc8cdba507bb182022026654bf8863af77d74f51f4e0b62d461a019561bb12acb120d3f7195d148a554014730440220643aacb19bbb72bd2b635bc3f7375481f5981bace78cdd8319b2988ffcc6704202203d27784ec8ad51ed3bd517a05525a5139bb0b755dd719e0054332d186ac0872701008576a91414011f7254d96b819c76986c277d115efce6f7b58763ac67210394854aa6eab5b2a8122cc726e9dded053a2184d88256816826d6231c068d4a5b7c820120876475527c21030d417a46946384f88d5f3337267c5e579765875dc4daca813e21734b140639e752ae67a9148a486ff2e31d6158bf39e2608864d63fefd09d5b88ac6868f7010000
 	 */
-	raw_tx = tx_from_hex(tmpctx, "020000000001018154ecccf11a5fb56c39654c4deb4d2296f83c69268280b94d021370c94e219703000000000000000001b80b0000000000002200204adb4e2f00643db396dd120d4e7dc17625f5f2c11a40d857accc862d6b7dd80e0500483045022100daee1808f9861b6c3ecd14f7b707eca02dd6bdfc714ba2f33bc8cdba507bb182022026654bf8863af77d74f51f4e0b62d461a019561bb12acb120d3f7195d148a554014730440220643aacb19bbb72bd2b635bc3f7375481f5981bace78cdd8319b2988ffcc6704202203d27784ec8ad51ed3bd517a05525a5139bb0b755dd719e0054332d186ac0872701008576a91414011f7254d96b819c76986c277d115efce6f7b58763ac67210394854aa6eab5b2a8122cc726e9dded053a2184d88256816826d6231c068d4a5b7c820120876475527c21030d417a46946384f88d5f3337267c5e579765875dc4daca813e21734b140639e752ae67a9148a486ff2e31d6158bf39e2608864d63fefd09d5b88ac6868f7010000");
+	raw_tx = tx_from_hex(tmpctx, "02000000017f6162d60bf6e3da6a03cf62e6b705b9234a9497aeae77075f0db54fc990a8aa03000000000000000001b80b0000000000002200204adb4e2f00643db396dd120d4e7dc17625f5f2c11a40d857accc862d6b7dd80ef7010000");
 	raw_tx->input[0].witness = NULL;
 	tx_must_be_eq(raw_tx, txs[4]);
+
 
 	/* BOLT #3:
 	 *
 	 *     output htlc_success_tx 4: 020000000001018154ecccf11a5fb56c39654c4deb4d2296f83c69268280b94d021370c94e219704000000000000000001a00f0000000000002200204adb4e2f00643db396dd120d4e7dc17625f5f2c11a40d857accc862d6b7dd80e050047304402207e0410e45454b0978a623f36a10626ef17b27d9ad44e2760f98cfa3efb37924f0220220bd8acd43ecaa916a80bd4f919c495a2c58982ce7c8625153f8596692a801d014730440220549e80b4496803cbc4a1d09d46df50109f546d43fbbf86cd90b174b1484acd5402205f12a4f995cb9bded597eabfee195a285986aa6d93ae5bb72507ebc6a4e2349e012004040404040404040404040404040404040404040404040404040404040404048a76a91414011f7254d96b819c76986c277d115efce6f7b58763ac67210394854aa6eab5b2a8122cc726e9dded053a2184d88256816826d6231c068d4a5b7c8201208763a91418bc1a114ccf9c052d3d23e28d3b0a9d1227434288527c21030d417a46946384f88d5f3337267c5e579765875dc4daca813e21734b140639e752ae677502f801b175ac686800000000
 	 */
-	raw_tx = tx_from_hex(tmpctx, "020000000001018154ecccf11a5fb56c39654c4deb4d2296f83c69268280b94d021370c94e219704000000000000000001a00f0000000000002200204adb4e2f00643db396dd120d4e7dc17625f5f2c11a40d857accc862d6b7dd80e050047304402207e0410e45454b0978a623f36a10626ef17b27d9ad44e2760f98cfa3efb37924f0220220bd8acd43ecaa916a80bd4f919c495a2c58982ce7c8625153f8596692a801d014730440220549e80b4496803cbc4a1d09d46df50109f546d43fbbf86cd90b174b1484acd5402205f12a4f995cb9bded597eabfee195a285986aa6d93ae5bb72507ebc6a4e2349e012004040404040404040404040404040404040404040404040404040404040404048a76a91414011f7254d96b819c76986c277d115efce6f7b58763ac67210394854aa6eab5b2a8122cc726e9dded053a2184d88256816826d6231c068d4a5b7c8201208763a91418bc1a114ccf9c052d3d23e28d3b0a9d1227434288527c21030d417a46946384f88d5f3337267c5e579765875dc4daca813e21734b140639e752ae677502f801b175ac686800000000");
+	raw_tx = tx_from_hex(tmpctx, "02000000017f6162d60bf6e3da6a03cf62e6b705b9234a9497aeae77075f0db54fc990a8aa04000000000000000001a00f0000000000002200204adb4e2f00643db396dd120d4e7dc17625f5f2c11a40d857accc862d6b7dd80e00000000");
 	raw_tx->input[0].witness = NULL;
 	tx_must_be_eq(raw_tx, txs[5]);
 

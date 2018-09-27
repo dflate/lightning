@@ -63,20 +63,22 @@ int main(void)
 
 	/* BOLT #3:
 	 *
-	 * Block 1 coinbase transaction: 01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff03510101ffffffff0100f2052a010000001976a9143ca33c2e4446f4a305f23c80df8ad1afdcf652f988ac00000000
+	 * Block 1 coinbase transaction: 01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff03510101ffffffff0100002cd6e2150000232102a74321b69723e7574510f2a96d3becea672dd465c747bc6b23b9771a4d02e48aac00000000
 	 */
+
 	input = bitcoin_tx_from_hex(tmpctx,
-				    "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff03510101ffffffff0100f2052a010000001976a9143ca33c2e4446f4a305f23c80df8ad1afdcf652f988ac00000000",
-				    strlen("01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff03510101ffffffff0100f2052a010000001976a9143ca33c2e4446f4a305f23c80df8ad1afdcf652f988ac00000000"));
+				 "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff03510101ffffffff0100002cd6e2150000232102a74321b69723e7574510f2a96d3becea672dd465c747bc6b23b9771a4d02e48aac00000000",
+				 strlen("01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff03510101ffffffff0100002cd6e2150000232102a74321b69723e7574510f2a96d3becea672dd465c747bc6b23b9771a4d02e48aac00000000"));
 	assert(input);
 
 	/* BOLT #3:
-	 *    Block 1 coinbase privkey: 6bd078650fcee8444e4e09825227b801a1ca928debb750eb36e6d56124bb20e801
-	 *    # privkey in base58: cRCH7YNcarfvaiY1GWUKQrRGmoezvfAiqHtdRvxe16shzbd7LDMz
+	 *    Block 1 coinbase privkey: 8344ce325246cce131a4785b3878daef212643c2d62aa23e170f05f38258807901
+	 *    # privkey in base58: cRysUDzUoa5BqfvaQnLwQ5aXGXsKD4Hh8Ai3sK6UYSx1CNyLBA2q
 	 */
-	if (!key_from_base58("cRCH7YNcarfvaiY1GWUKQrRGmoezvfAiqHtdRvxe16shzbd7LDMz", strlen("cRCH7YNcarfvaiY1GWUKQrRGmoezvfAiqHtdRvxe16shzbd7LDMz"),
+	if (!key_from_base58("cRysUDzUoa5BqfvaQnLwQ5aXGXsKD4Hh8Ai3sK6UYSx1CNyLBA2q",strlen("cRysUDzUoa5BqfvaQnLwQ5aXGXsKD4Hh8Ai3sK6UYSx1CNyLBA2q"),
 			     &testnet, &input_privkey, &inputkey))
 		abort();
+	/* testnet coinbase */
 	assert(testnet);
 	printf("* Block 1 coinbase privkey: %s\n",
 	       type_to_string(tmpctx, struct privkey, &input_privkey));
@@ -88,18 +90,18 @@ int main(void)
 	 *     local_funding_pubkey: 023da092f6980e58d2c037173180e9a465476026ee50f96695963e8efe436f54eb
 	 *     remote_funding_pubkey: 030e9f7b623d2ccc7c9bd44d66d5ce21ce504c0acf6385a132cec6d3c39fa711c1
 	 */
-	if (!pubkey_from_hexstr("023da092f6980e58d2c037173180e9a465476026ee50f96695963e8efe436f54eb",
-				strlen("023da092f6980e58d2c037173180e9a465476026ee50f96695963e8efe436f54eb"),
+	if (!pubkey_from_hexstr("0282600e6ffb205676f45b19bd4ff3bd7b0980dcb8d7979fe988516d7e7e95db27",
+				strlen("0282600e6ffb205676f45b19bd4ff3bd7b0980dcb8d7979fe988516d7e7e95db27"),
 				&local_funding_pubkey))
 		abort();
-	if (!pubkey_from_hexstr("030e9f7b623d2ccc7c9bd44d66d5ce21ce504c0acf6385a132cec6d3c39fa711c1",
+	if (!pubkey_from_hexstr("0282600e6ffb205676f45b19bd4ff3bd7b0980dcb8d7979fe988516d7e7e95db27",
 				strlen("030e9f7b623d2ccc7c9bd44d66d5ce21ce504c0acf6385a132cec6d3c39fa711c1"),
 				&remote_funding_pubkey))
 		abort();
 
 	bitcoin_txid(input, &utxo.txid);
 	utxo.outnum = 0;
-	utxo.amount = 5000000000;
+	utxo.amount = 24064000000000;
 	utxo.is_p2sh = false;
 	utxo.close_info = NULL;
 	funding_satoshis = 10000000;

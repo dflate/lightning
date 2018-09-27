@@ -397,8 +397,8 @@ def test_withdraw(node_factory, bitcoind):
     assert l1.db_query('SELECT COUNT(*) as c FROM outputs WHERE status=2')[0]['c'] == 4
 
     # Simple test for withdrawal to P2WPKH
-    # Address from: https://bc-2.jp/tools/bech32demo/index.html
-    waddr = 'bcrt1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080'
+
+    waddr = 'grsrt1qccn808860ygrqq98e6ltplxu8hvjk08ngwkdpr'
     with pytest.raises(RpcError):
         l1.rpc.withdraw('xx1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx', 2 * amount)
     with pytest.raises(RpcError):
@@ -411,8 +411,8 @@ def test_withdraw(node_factory, bitcoind):
     assert l1.db_query('SELECT COUNT(*) as c FROM outputs WHERE status=2')[0]['c'] == 6
 
     # Simple test for withdrawal to P2WSH
-    # Address from: https://bc-2.jp/tools/bech32demo/index.html
-    waddr = 'bcrt1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qzf4jry'
+    # FIXME GENERATE REAL P2WSH ADDR
+    waddr = 'grsrt1qpc4mnd3zfzjnyyyxj97yxcastjh7cx7m3ex6pn33quse9qleqsjsnakslv'
     with pytest.raises(RpcError):
         l1.rpc.withdraw('xx1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3q0sl5k7', 2 * amount)
     with pytest.raises(RpcError):
@@ -732,22 +732,22 @@ def test_rescan(node_factory, bitcoind):
     """
     l1 = node_factory.get_node()
 
-    # The first start should start at current_height - 30 = 71, make sure
+    # The first start should start at current_height - 60 = 61, make sure
     # it's not earlier
-    l1.daemon.wait_for_log(r'Adding block 101')
-    assert not l1.daemon.is_in_log(r'Adding block 70')
+    l1.daemon.wait_for_log(r'Adding block 121')
+    assert not l1.daemon.is_in_log(r'Adding block 60')
 
     # Restarting with a higher rescan should go back further
     l1.daemon.opts['rescan'] = 50
     l1.restart()
-    l1.daemon.wait_for_log(r'Adding block 101')
-    assert l1.daemon.is_in_log(r'Adding block 51')
-    assert not l1.daemon.is_in_log(r'Adding block 50')
+    l1.daemon.wait_for_log(r'Adding block 121')
+    assert l1.daemon.is_in_log(r'Adding block 71')
+    assert not l1.daemon.is_in_log(r'Adding block 70')
 
     # Restarting with an absolute rescan should start from there
     l1.daemon.opts['rescan'] = -31
     l1.restart()
-    l1.daemon.wait_for_log(r'Adding block 101')
+    l1.daemon.wait_for_log(r'Adding block 121')
     assert l1.daemon.is_in_log(r'Adding block 31')
     assert not l1.daemon.is_in_log(r'Adding block 30')
 
@@ -757,8 +757,8 @@ def test_rescan(node_factory, bitcoind):
     l1.stop()
     bitcoind.rpc.generate(4)
     l1.start()
-    l1.daemon.wait_for_log(r'Adding block 105')
-    assert not l1.daemon.is_in_log(r'Adding block 102')
+    l1.daemon.wait_for_log(r'Adding block 125')
+    assert not l1.daemon.is_in_log(r'Adding block 122')
 
 
 def test_reserve_enforcement(node_factory, executor):
