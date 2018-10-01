@@ -62,11 +62,11 @@ struct bitcoin_tx *bitcoin_tx(const tal_t *ctx, varint_t input_count,
 struct bitcoin_tx *bitcoin_tx_from_hex(const tal_t *ctx, const char *hex,
 				       size_t hexlen);
 
-/* Parse hex string to get txid (reversed, a-la bitcoind). */
+/* Parse hex string to get txid (reversed, a-la groestlcoind). */
 bool bitcoin_txid_from_hex(const char *hexstr, size_t hexstr_len,
 			   struct bitcoin_txid *txid);
 
-/* Get hex string of txid (reversed, a-la bitcoind). */
+/* Get hex string of txid (reversed, a-la groestlcoind). */
 bool bitcoin_txid_to_hex(const struct bitcoin_txid *txid,
 			 char *hexstr, size_t hexstr_len);
 

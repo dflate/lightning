@@ -100,7 +100,7 @@ struct chain_topology {
 	/* How often to poll. */
 	u32 poll_seconds;
 
-	/* The bitcoind. */
+	/* The groestlcoind. */
 	struct bitcoind *bitcoind;
 
 	/* Our timer list. */

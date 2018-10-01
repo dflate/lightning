@@ -5,7 +5,7 @@
  * and a few startup sanity checks.
  *
  * The role of this daemon is to start the subdaemons, shuffle peers
- * between them, handle the JSON RPC requests, bitcoind, the database
+ * between them, handle the JSON RPC requests, groestlcoind, the database
  * and centralize logging.  In theory, it doesn't trust the other
  * daemons, though we expect `hsmd` (which holds secret keys) to be
  * responsive.
@@ -432,8 +432,8 @@ static void shutdown_subdaemons(struct lightningd *ld)
 const struct chainparams *get_chainparams(const struct lightningd *ld)
 {
 	/* "The lightningd is connected to the blockchain."
-	 * "The blockchain is connected to the bitcoind API."
-	 * "The bitcoind API is connected chain parameters."
+	 * "The blockchain is connected to the groestlcoind API."
+	 * "The groestlcoind API is connected chain parameters."
 	 * -- Worst childhood song ever. */
 	return ld->topology->bitcoind->chainparams;
 }
@@ -650,7 +650,7 @@ int main(int argc, char *argv[])
 	load_channels_from_wallet(ld);
 
 	/*~ Get the blockheight we are currently at, UINT32_MAX is used to signal
-	 * an uninitialized wallet and that we should start off of bitcoind's
+	 * an uninitialized wallet and that we should start off of groestlcoind's
 	 * current height */
 	wallet_blocks_heights(ld->wallet, UINT32_MAX,
 			      &min_blockheight, &max_blockheight);
@@ -669,7 +669,7 @@ int main(int argc, char *argv[])
 	db_commit_transaction(ld->wallet->db);
 
 	/*~ Initialize block topology.  This does its own io_loop to
-	 * talk to bitcoind, so does its own db transactions. */
+	 * talk to groestlcoind, so does its own db transactions. */
 	setup_topology(ld->topology, &ld->timers,
 		       min_blockheight, max_blockheight);
 
@@ -722,7 +722,7 @@ int main(int argc, char *argv[])
 	activate_peers(ld);
 
 	/*~ Now that all the notifications for transactions are in place, we
-	 *  can start the poll loop which queries bitcoind for new blocks. */
+	 *  can start the poll loop which queries groestlcoind for new blocks. */
 	begin_topology(ld->topology);
 
 	/*~ Setting this (global) activates the crash log: we don't usually need

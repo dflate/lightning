@@ -10,8 +10,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - JSON API: `listpeers` has new field `scratch_txid`: the latest tx in channel.
 - JSON API: `listchannels` has two new fields: `message_flags` and `channel_flags`. This replaces `flags`.
-- Bitcoind: more parallelism in requests, for very slow nodes.
-- Testing: fixed logging, cleaner interception of bitcoind, minor fixes.
+- Groestlcoind: more parallelism in requests, for very slow nodes.
+- Testing: fixed logging, cleaner interception of groestlcoind, minor fixes.
 
 ### Changed
 
@@ -79,7 +79,7 @@ This release named by ZmnSCPxj.
   the one given or the first one announced.
 - Crash logs are now placed one-per file like `crash.log.20180822233752`
 - We will no longer allow withdrawing funds or funding channels if we
-  do not have a fee estimate (eg. bitcoind not synced); use new `feerate` arg.
+  do not have a fee estimate (eg. groestlcoind not synced); use new `feerate` arg.
 
 ### Deprecated
 

@@ -1,4 +1,4 @@
-""" A bitcoind proxy that allows instrumentation and canned responses
+""" A groestlcoind proxy that allows instrumentation and canned responses
 """
 from flask import Flask, request
 from bitcoin.rpc import JSONRPCError
@@ -80,7 +80,7 @@ class BitcoinRpcProxy(object):
         self.proxy_thread.daemon = True
         self.proxy_thread.start()
 
-        # Now that bitcoind is running on the real rpcport, let's tell all
+        # Now that groeslcoind is running on the real rpcport, let's tell all
         # future callers to talk to the proxyport. We use the bind_addr as a
         # signal that the port is bound and accepting connections.
         while self.server.bind_addr[1] == 0:
@@ -98,7 +98,7 @@ class BitcoinRpcProxy(object):
 
         The response can either be a dict with the full JSON-RPC response, or a
         function that returns such a response. If the response is None the mock
-        is removed and future calls will be passed through to bitcoind again.
+        is removed and future calls will be passed through to groestlcoind again.
 
         """
         if response is not None:

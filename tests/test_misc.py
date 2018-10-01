@@ -873,14 +873,14 @@ def test_feerates(node_factory):
     # Query feerates (shouldn't give any!)
     feerates = l1.rpc.feerates('perkw')
     assert len(feerates['perkw']) == 2
-    assert feerates['warning'] == 'Some fee estimates unavailable: bitcoind startup?'
+    assert feerates['warning'] == 'Some fee estimates unavailable: groestlcoind startup?'
     assert 'perkb' not in feerates
     assert feerates['perkw']['max_acceptable'] == 2**32 - 1
     assert feerates['perkw']['min_acceptable'] == 253
 
     feerates = l1.rpc.feerates('perkb')
     assert len(feerates['perkb']) == 2
-    assert feerates['warning'] == 'Some fee estimates unavailable: bitcoind startup?'
+    assert feerates['warning'] == 'Some fee estimates unavailable: groestlcoind startup?'
     assert 'perkw' not in feerates
     assert feerates['perkb']['max_acceptable'] == (2**32 - 1)
     assert feerates['perkb']['min_acceptable'] == 253 * 4
@@ -890,7 +890,7 @@ def test_feerates(node_factory):
     feerates = l1.rpc.feerates('perkw')
     assert len(feerates['perkw']) == 3
     assert feerates['perkw']['urgent'] == 15000
-    assert feerates['warning'] == 'Some fee estimates unavailable: bitcoind startup?'
+    assert feerates['warning'] == 'Some fee estimates unavailable: groestlcoind startup?'
     assert 'perkb' not in feerates
     assert feerates['perkw']['max_acceptable'] == 15000 * 10
     assert feerates['perkw']['min_acceptable'] == 253
@@ -900,7 +900,7 @@ def test_feerates(node_factory):
     assert len(feerates['perkb']) == 4
     assert feerates['perkb']['urgent'] == 15000 * 4
     assert feerates['perkb']['normal'] == 25000
-    assert feerates['warning'] == 'Some fee estimates unavailable: bitcoind startup?'
+    assert feerates['warning'] == 'Some fee estimates unavailable: groestlcoind startup?'
     assert 'perkw' not in feerates
     assert feerates['perkb']['max_acceptable'] == 15000 * 4 * 10
     assert feerates['perkb']['min_acceptable'] == 253 * 4

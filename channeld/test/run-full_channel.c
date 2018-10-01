@@ -25,7 +25,7 @@ void status_fmt(enum log_level level UNUSED, const char *fmt, ...)
 	va_end(ap);
 }
 
-/* bitcoind loves its backwards txids! */
+/* groestlcoind loves its backwards txids! */
 static struct bitcoin_txid txid_from_hex(const char *hex)
 {
 	struct bitcoin_txid txid;

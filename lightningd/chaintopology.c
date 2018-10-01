@@ -148,7 +148,7 @@ static void broadcast_remainder(struct bitcoind *bitcoind,
 			   broadcast_remainder, txs);
 }
 
-/* FIXME: This is dumb.  We can group txs and avoid bothering bitcoind
+/* FIXME: This is dumb.  We can group txs and avoid bothering groestlcoind
  * if any one tx is in the main chain. */
 static void rebroadcast_txs(struct chain_topology *topo, struct command *cmd)
 {
@@ -731,9 +731,9 @@ static void get_init_block(struct bitcoind *bitcoind,
 static void get_init_blockhash(struct bitcoind *bitcoind, u32 blockcount,
 			       struct chain_topology *topo)
 {
-	/* If bitcoind's current blockheight is below the requested height, just
+	/* If groestlcoind's current blockheight is below the requested height, just
 	 * go back to that height. This might be a new node catching up, or
-	 * bitcoind is processing a reorg. */
+	 * groestlcoind is processing a reorg. */
 	if (blockcount < topo->max_blockheight) {
 		if (topo->max_blockheight == UINT32_MAX) {
 			/* Relative rescan, but we didn't know the blockheight */
@@ -744,7 +744,7 @@ static void get_init_blockhash(struct bitcoind *bitcoind, u32 blockcount,
 			else
 				topo->max_blockheight = blockcount - bitcoind->ld->config.rescan;
 		} else {
-			/* Absolute blockheight, but bitcoind's blockheight isn't there yet */
+			/* Absolute blockheight, but groestlcoind's blockheight isn't there yet */
 			/* Protect against underflow in subtraction.
 			 * Possible in regtest mode. */
 			if (blockcount < 1)
@@ -879,7 +879,7 @@ void setup_topology(struct chain_topology *topo,
 	topo->min_blockheight = min_blockheight;
 	topo->max_blockheight = max_blockheight;
 
-	/* Make sure bitcoind is started, and ready */
+	/* Make sure groestlcoind is started, and ready */
 	wait_for_bitcoind(topo->bitcoind);
 
 	bitcoind_getblockcount(topo->bitcoind, get_init_blockhash, topo);

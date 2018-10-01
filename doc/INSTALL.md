@@ -23,8 +23,8 @@ For actually doing development and running the tests, you will also need:
 * asciidoc: for formatting the man pages (if you change them)
 * valgrind: for extra debugging checks
 
-You will also need a version of bitcoind with segregated witness and
-estimatesmartfee economical node, such as the 0.15 or above.
+You will also need a version of groestlcoind with segregated witness and
+estimatesmartfee economical node, such as the 2.16.0 or above.
 
 To Build on Ubuntu
 ---------------------
@@ -38,13 +38,13 @@ Get dependencies:
       autoconf automake build-essential git libtool libgmp-dev \
       libsqlite3-dev python python3 net-tools zlib1g-dev
 
-If you don't have Bitcoin installed locally you'll need to install that
+If you don't have Groestlcoin installed locally you'll need to install that
 as well:
 
     sudo apt-get install software-properties-common
-    sudo add-apt-repository ppa:bitcoin/bitcoin
+    sudo add-apt-repository ppa:groestlcoin/groestlcoin
     sudo apt-get update
-    sudo apt-get install -y bitcoind
+    sudo apt-get install -y groestlcoind
 
 For development or running tests, get additional dependencies:
 
@@ -53,7 +53,7 @@ For development or running tests, get additional dependencies:
 
 Clone lightning:
 
-    git clone https://github.com/ElementsProject/lightning.git
+    git clone https://github.com/groestlcoin/lightning.git
     cd lightning
 
 Build lightning:
@@ -63,11 +63,11 @@ Build lightning:
 
 Running lightning:
 
-    bitcoind &
+    groestlcoind &
     ./lightningd/lightningd &
     ./cli/lightning-cli help
 
-**Note**: You may need to include `testnet=1` in `bitcoin.conf`
+**Note**: You may need to include `testnet=1` in `groestlcoin.conf`
 
 To Build on Fedora
 ---------------------
@@ -97,11 +97,11 @@ $ sudo dnf update -y && \
         sudo dnf clean all
 ```
 
-Make sure you have [bitcoind](https://github.com/bitcoin/bitcoin) available to run
+Make sure you have [groestlcoind](https://github.com/groestlcoin/groestlcoin) available to run
 
 Clone lightning:
 ```
-$ git clone https://github.com/ElementsProject/lightning.git
+$ git clone https://github.com/groestlcoin/lightning.git
 $ cd lightning
 ```
 
@@ -114,61 +114,14 @@ $lightning> sudo make install
 
 Running lightning (mainnet):
 ```
-$ bitcoind &
-$ lightningd --network=bitcoin
+$ groetlcoind &
+$ lightningd --network=groestlcoin
 ```
 
 Running lightning on testnet:
 ```
-$ bitcoind -testnet &
+$ groestlcoind -testnet &
 $ lightningd --network=testnet
-```
-
-To Build on FreeBSD
----------------------
-
-OS version: FreeBSD 11.1-RELEASE or above
-
-Get dependencies:
-
-    # pkg install -y \
-      autoconf automake git gmp asciidoc gmake libtool python python3 sqlite3
-
-If you don't have Bitcoin installed locally you'll need to install that
-as well:
-
-    # pkg install -y bitcoin-daemon bitcoin-utils
-
-Clone lightning:
-
-    $ git clone https://github.com/ElementsProject/lightning.git
-    $ cd lightning
-
-Build lightning:
-
-    $ ./configure
-    $ gmake
-    $ gmake install
-
-Running lightning:
-
-**Note**: Edit your `/usr/local/etc/bitcoin.conf` to include
-`rpcuser=<foo>` and `rpcpassword=<bar>` first, you may also need to
-include `testnet=1`
-
-    # service bitcoind start
-    $ ./lightningd/lightningd &
-    $ ./cli/lightning-cli help
-
-To Build on NixOS
---------------------
-
-Use nix-shell launch a shell with a full clightning dev environment:
-
-```
-$ nix-shell -Q -p gdb sqlite autoconf git clang libtool gmp sqlite autoconf \
-autogen automake 'python3.withPackages (p: [p.bitcoinlib])' \
-valgrind asciidoc --run make
 ```
 
 To Build on macOS
@@ -179,20 +132,22 @@ Get dependencies:
 
     $ brew install autoconf automake libtool python3 gmp gnu-sed
 
-If you don't have bitcoind installed locally you'll need to install that
+If you don't have groestlcoind installed locally you'll need to install that
 as well:
 
     $ brew install \
-    berkeley-db4 boost miniupnpc openssl pkg-config protobuf qt libevent
-    $ git clone https://github.com/bitcoin/bitcoin
-    $ cd bitcoin
+    boost miniupnpc openssl pkg-config protobuf qt libevent
+    $ brew tap zeroc-ice/tap
+    $ brew install zeroc-ice/tap/berkeley-db@5.3
+    $ git clone https://github.com/groestlcoin/groestlcoin
+    $ cd groestlcoin
     $ ./autogen.sh
-    $ ./configure
+    $ ./configure LDFLAGS=-L/usr/local/opt/berkeley-db@5.3/lib CPPFLAGS=-I/usr/local/opt/berkeley-db@5.3/include
     $ make & make install
 
 Clone lightning:
 
-    $ git clone https://github.com/ElementsProject/lightning.git
+    $ git clone https://github.com/groestlcoin/lightning.git
     $ cd lightning
 
 Build lightning:
@@ -202,11 +157,11 @@ Build lightning:
 
 Running lightning:
 
-**Note**: Edit your `~/Library/Application\ Support/Bitcoin/bitcoin.conf`
+**Note**: Edit your `~/Library/Application\ Support/Groestlcoin/groestlcoin.conf`
 to include `rpcuser=<foo>` and `rpcpassword=<bar>` first, you may also
 need to include `testnet=1`
 
-    bitcoind &
+    groestlcoind &
     ./lightningd/lightningd &
     ./cli/lightning-cli help
 
@@ -279,9 +234,9 @@ For all the other Pi devices out there, consider using [Armbian](https://www.arm
 
 You can compile in `customize-image.sh` using the instructions for Ubuntu.
 
-A working example that compiles both bitcoind and c-lightning for Armbian can
-be found [here](https://github.com/Sjors/armbian-bitcoin-core).
+A working example that compiles both groestlcoind and c-lightning for Armbian can
+be found [here](https://github.com/groestlcoin/armbian-groestlcoin-core).
 
 Additional steps
 --------------------
-Go to [README](https://github.com/ElementsProject/lightning/blob/master/README.md) for more information how to create an address, add funds, connect to a node, etc.
+Go to [README](https://github.com/groestlcoin/lightning/blob/master/README.md) for more information how to create an address, add funds, connect to a node, etc.

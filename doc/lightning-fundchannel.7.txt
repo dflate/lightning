@@ -22,10 +22,10 @@ for the channel.
 
 'id' is the peer id obtained from *connect*.
 
-'satoshi' is the amount in satoshis taken from the internal wallet to fund the channel.
-The string 'all' can be used to specify all available funds (or 16777215 satoshi if more is available).
+'gro' is the amount in gro's taken from the internal wallet to fund the channel.
+The string 'all' can be used to specify all available funds (or 16777215 gro if more is available).
 The value cannot be less than the dust limit, currently set to 546, nor more
-than 16777215 satoshi.
+than 16777215 gro.
 
 'feerate' is an optional feerate to use.  It can be one of the strings
 'urgent', 'normal' or 'slow' to use lightningd's internal estimates:
@@ -33,8 +33,8 @@ than 16777215 satoshi.
 
 Otherwise, 'feerate' is a number, with an optional suffix:
 'perkw' means the number is interpreted as satoshi-per-kilosipa
-(weight), and 'perkb' means it is interpreted bitcoind-style as
-satoshi-per-kilobyte.  Omitting the suffix is equivalent to 'perkb'.
+(weight), and 'perkb' means it is interpreted groestlcoind-style as
+gro-per-kilobyte.  Omitting the suffix is equivalent to 'perkb'.
 
 RETURN VALUE
 ------------
