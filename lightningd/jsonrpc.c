@@ -780,7 +780,7 @@ bool json_tok_wtx(struct wallet_tx * tx, const char * buffer,
 		tx->amount = max;
         } else if (!json_to_u64(buffer, sattok, &tx->amount)) {
                 command_fail(tx->cmd, JSONRPC2_INVALID_PARAMS,
-			     "Invalid satoshis");
+			     "Invalid gro's");
                 return false;
 	} else if (tx->amount > max) {
                 command_fail(tx->cmd, FUND_MAX_EXCEEDED,
