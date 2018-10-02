@@ -120,7 +120,7 @@ class LightningRpc(UnixDomainSocketRpc):
 
     def getroute(self, peer_id, msatoshi, riskfactor, cltv=9, fromid=None, fuzzpercent=None, seed=None):
         """
-        Show route to {id} for {msatoshi}, using {riskfactor} and optional
+        Show route to {id} for {mgro}, using {riskfactor} and optional
         {cltv} (default 9). If specified search from {fromid} otherwise use
         this node as source. Randomize the route with up to {fuzzpercent}
         (0.0 -> 100.0, default 5.0) using {seed} as an arbitrary-size string
@@ -128,7 +128,7 @@ class LightningRpc(UnixDomainSocketRpc):
         """
         payload = {
             "id": peer_id,
-            "msatoshi": msatoshi,
+            "mgro": msatoshi,
             "riskfactor": riskfactor,
             "cltv": cltv,
             "fromid": fromid,
@@ -148,11 +148,11 @@ class LightningRpc(UnixDomainSocketRpc):
 
     def invoice(self, msatoshi, label, description, expiry=None, fallbacks=None, preimage=None):
         """
-        Create an invoice for {msatoshi} with {label} and {description} with
+        Create an invoice for {mgro} with {label} and {description} with
         optional {expiry} seconds (default 1 hour)
         """
         payload = {
-            "msatoshi": msatoshi,
+            "mgro": msatoshi,
             "label": label,
             "description": description,
             "expiry": expiry,
@@ -284,7 +284,7 @@ class LightningRpc(UnixDomainSocketRpc):
 
     def pay(self, bolt11, msatoshi=None, description=None, riskfactor=None):
         """
-        Send payment specified by {bolt11} with optional {msatoshi}
+        Send payment specified by {bolt11} with optional {mgro}
         (if and only if {bolt11} does not have amount),
 
         {description} (required if {bolt11} uses description hash)
@@ -292,7 +292,7 @@ class LightningRpc(UnixDomainSocketRpc):
         """
         payload = {
             "bolt11": bolt11,
-            "msatoshi": msatoshi,
+            "mgro": msatoshi,
             "description": description,
             "riskfactor": riskfactor
         }
@@ -333,11 +333,11 @@ class LightningRpc(UnixDomainSocketRpc):
 
     def fundchannel(self, node_id, satoshi, feerate=None):
         """
-        Fund channel with {id} using {satoshi} satoshis"
+        Fund channel with {id} using {gro} gro's"
         """
         payload = {
             "id": node_id,
-            "satoshi": satoshi,
+            "gro": satoshi,
             "feerate": feerate
         }
         return self.call("fundchannel", payload)
@@ -407,12 +407,12 @@ class LightningRpc(UnixDomainSocketRpc):
 
     def withdraw(self, destination, satoshi, feerate=None):
         """
-        Send to {destination} address {satoshi} (or "all")
-        amount via Bitcoin transaction
+        Send to {destination} address {gro} (or "all")
+        amount via Groestlcoin transaction
         """
         payload = {
             "destination": destination,
-            "satoshi": satoshi,
+            "gro": satoshi,
             "feerate": feerate
         }
         return self.call("withdraw", payload)

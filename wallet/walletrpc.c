@@ -98,7 +98,7 @@ static void json_withdraw(struct command *cmd,
 
 	if (!param(cmd, buffer, params,
 		   p_req("destination", json_tok_tok, &desttok),
-		   p_req("satoshi", json_tok_tok, &sattok),
+		   p_req("gro", json_tok_tok, &sattok),
 		   p_opt("feerate", json_tok_feerate, &feerate_per_kw),
 		   NULL))
 		return;

@@ -40,11 +40,11 @@ static void json_add_invoice(struct json_result *response,
 	json_add_string(response, "bolt11", inv->bolt11);
 	json_add_hex(response, "payment_hash", &inv->rhash, sizeof(inv->rhash));
 	if (inv->msatoshi)
-		json_add_u64(response, "msatoshi", *inv->msatoshi);
+		json_add_u64(response, "mgro", *inv->msatoshi);
 	json_add_string(response, "status", invoice_status_str(inv));
 	if (inv->state == PAID) {
 		json_add_u64(response, "pay_index", inv->pay_index);
-		json_add_u64(response, "msatoshi_received",
+		json_add_u64(response, "mgro_received",
 			     inv->msatoshi_received);
 		json_add_u64(response, "paid_at", inv->paid_timestamp);
 	}
@@ -145,7 +145,7 @@ static void json_invoice(struct command *cmd,
 	bool result;
 
 	if (!param(cmd, buffer, params,
-		   p_req("msatoshi", json_tok_msat, &msatoshi_val),
+		   p_req("mgro", json_tok_msat, &msatoshi_val),
 		   p_req("label", json_tok_label, &label_val),
 		   p_req("description", json_tok_escaped_string, &desc_val),
 		   p_opt_def("expiry", json_tok_u64, &expiry, 3600),
@@ -567,7 +567,7 @@ static void json_decodepay(struct command *cmd,
 	json_add_u64(response, "expiry", b11->expiry);
 	json_add_pubkey(response, "payee", &b11->receiver_id);
         if (b11->msatoshi)
-                json_add_u64(response, "msatoshi", *b11->msatoshi);
+                json_add_u64(response, "mgro", *b11->msatoshi);
         if (b11->description) {
 		struct json_escaped *esc = json_escape(NULL, b11->description);
                 json_add_escaped_string(response, "description", take(esc));
@@ -600,7 +600,7 @@ static void json_decodepay(struct command *cmd,
                                                           "short_channel_id",
                                                           &b11->routes[i][n]
                                                           .short_channel_id);
-                                json_add_u64(response, "fee_base_msat",
+                                json_add_u64(response, "fee_base_mgro",
                                              b11->routes[i][n].fee_base_msat);
                                 json_add_u64(response, "fee_proportional_millionths",
                                              b11->routes[i][n].fee_proportional_millionths);

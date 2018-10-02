@@ -24,7 +24,7 @@ json_add_route_hop(struct json_result *r, char const *n,
 	json_add_pubkey(r, "id", &h->nodeid);
 	json_add_short_channel_id(r, "channel",
 				  &h->channel_id);
-	json_add_u64(r, "msatoshi", h->amount);
+	json_add_u64(r, "mgro", h->amount);
 	json_add_num(r, "delay", h->delay);
 	json_object_end(r);
 }
@@ -50,8 +50,8 @@ json_add_payment_fields(struct json_result *response,
 	json_add_u64(response, "id", t->id);
 	json_add_hex(response, "payment_hash", &t->payment_hash, sizeof(t->payment_hash));
 	json_add_pubkey(response, "destination", &t->destination);
-	json_add_u64(response, "msatoshi", t->msatoshi);
-	json_add_u64(response, "msatoshi_sent", t->msatoshi_sent);
+	json_add_u64(response, "mgro", t->msatoshi);
+	json_add_u64(response, "mgro_sent", t->msatoshi_sent);
 	json_add_u64(response, "created_at", t->timestamp);
 
 	switch (t->status) {
