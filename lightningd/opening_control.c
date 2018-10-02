@@ -774,7 +774,7 @@ static void json_fund_channel(struct command *cmd,
 	wtx_init(cmd, &fc->wtx);
 	if (!param(fc->cmd, buffer, params,
 		   p_req("id", json_tok_pubkey, &id),
-		   p_req("satoshi", json_tok_tok, &sattok),
+		   p_req("gro", json_tok_tok, &sattok),
 		   p_opt("feerate", json_tok_feerate, &feerate_per_kw),
 		   NULL))
 		return;

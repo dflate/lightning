@@ -282,7 +282,7 @@ static void json_getroute(struct command *cmd, const char *buffer, const jsmntok
 
 	if (!param(cmd, buffer, params,
 		   p_req("id", json_tok_pubkey, &destination),
-		   p_req("msatoshi", json_tok_u64, &msatoshi),
+		   p_req("mgro", json_tok_u64, &msatoshi),
 		   p_req("riskfactor", json_tok_double, &riskfactor),
 		   p_opt_def("cltv", json_tok_number, &cltv, 9),
 		   p_opt_def("fromid", json_tok_pubkey, &source, ld->id),

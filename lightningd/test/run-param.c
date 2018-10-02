@@ -315,7 +315,7 @@ static void bad_programmer(void)
 	assert(!param(cmd, j->buffer, j->toks,
 		      p_req("u64", json_tok_u64, &ival),
 		      p_req("double", json_tok_double, &dval),
-		      p_opt_def("msatoshi", json_tok_number, &msatoshi, 100),
+		      p_opt_def("mgro", json_tok_number, &msatoshi, 100),
 		      p_req("riskfactor", json_tok_double, &riskfactor), NULL));
 	assert(*msatoshi);
 	assert(*msatoshi == 100);
@@ -392,7 +392,7 @@ static void sendpay(void)
 		   p_req("route", json_tok_tok, &routetok),
 		   p_req("cltv", json_tok_number, &cltv),
 		   p_opt("note", json_tok_tok, &note),
-		   p_opt("msatoshi", json_tok_u64, &msatoshi),
+		   p_opt("mgro", json_tok_u64, &msatoshi),
 		   NULL))
 		assert(false);
 
@@ -415,7 +415,7 @@ static void sendpay_nulltok(void)
 		   p_req("route", json_tok_tok, &routetok),
 		   p_req("cltv", json_tok_number, &cltv),
 		   p_opt("note", json_tok_tok, &note),
-		   p_opt("msatoshi", json_tok_u64, &msatoshi),
+		   p_opt("mgro", json_tok_u64, &msatoshi),
 		   NULL))
 		assert(false);
 
@@ -529,7 +529,7 @@ static void test_invoice(struct command *cmd, const char *buffer,
 
 	assert(cmd->mode == CMD_USAGE);
 	if(!param(cmd, buffer, params,
-		  p_req("msatoshi", json_tok_msat, &msatoshi_val),
+		  p_req("mgro", json_tok_msat, &msatoshi_val),
 		  p_req("label", json_tok_label, &label_val),
 		  p_req("description", json_tok_escaped_string, &desc_val),
 		  p_opt("expiry", json_tok_u64, &expiry),

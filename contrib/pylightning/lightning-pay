@@ -43,7 +43,7 @@ else:
 
 route = ld.getroute(id_, amount, 1)
 
-fee = route["route"][0]["msatoshi"] - amount
+fee = route["route"][0]["mgro"] - amount
 
 reply = input("Paying fee %s on amount %s (%.3f%%). Send [Y/n]?" % (fee, amount, fee / amount * 100.0))
 

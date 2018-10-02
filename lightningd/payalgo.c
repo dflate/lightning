@@ -446,7 +446,7 @@ static void json_pay_getroute_reply(struct subd *gossip UNUSED,
 	if ((fee_too_high || delay_too_high) && pay->fuzz < 0.01) {
 		data = new_json_result(pay);
 		json_object_start(data, NULL);
-		json_add_u64(data, "msatoshi", pay->msatoshi);
+		json_add_u64(data, "mgro", pay->msatoshi);
 		json_add_u64(data, "fee", fee);
 		json_add_double(data, "feepercent", feepercent);
 		json_add_double(data, "maxfeepercent", pay->maxfeepercent);
@@ -612,7 +612,7 @@ static void json_pay(struct command *cmd,
 
 	if (!param(cmd, buffer, params,
 		   p_req("bolt11", json_tok_string, &b11str),
-		   p_opt("msatoshi", json_tok_u64, &msatoshi),
+		   p_opt("mgro", json_tok_u64, &msatoshi),
 		   p_opt("description", json_tok_string, &desc),
 		   p_opt_def("riskfactor", json_tok_double, &riskfactor, 1.0),
 		   p_opt_def("maxfeepercent", json_tok_percent, &maxfeepercent, 0.5),
