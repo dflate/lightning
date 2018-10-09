@@ -145,8 +145,7 @@ static struct node *new_node(struct routing_state *rstate,
 	n = tal(rstate, struct node);
 	n->id = *id;
 	n->chans = tal_arr(n, struct chan *, 0);
-	n->alias = NULL;
-	n->gfeatures = NULL;
+	n->globalfeatures = NULL;
 	n->node_announcement = NULL;
 	n->node_announcement_index = 0;
 	n->last_timestamp = -1;
@@ -291,7 +290,6 @@ struct chan *new_chan(struct routing_state *rstate,
 {
 	struct chan *chan = tal(rstate, struct chan);
 	int n1idx = pubkey_idx(id1, id2);
-	size_t n;
 	struct node *n1, *n2;
 
 	/* We should never add a channel twice */
@@ -314,12 +312,8 @@ struct chan *new_chan(struct routing_state *rstate,
 	chan->satoshis = satoshis;
 	chan->local_disabled = false;
 
-	n = tal_count(n2->chans);
-	tal_resize(&n2->chans, n+1);
-	n2->chans[n] = chan;
-	n = tal_count(n1->chans);
-	tal_resize(&n1->chans, n+1);
-	n1->chans[n] = chan;
+	*tal_arr_expand(&n2->chans) = chan;
+	*tal_arr_expand(&n1->chans) = chan;
 
 	/* Populate with (inactive) connections */
 	init_half_chan(rstate, chan, n1idx);
@@ -1252,7 +1246,6 @@ static struct wireaddr *read_addresses(const tal_t *ctx, const u8 *ser)
 	const u8 *cursor = ser;
 	size_t len = tal_count(ser);
 	struct wireaddr *wireaddrs = tal_arr(ctx, struct wireaddr, 0);
-	int numaddrs = 0;
 
 	while (cursor && len) {
 		struct wireaddr wireaddr;
@@ -1278,9 +1271,7 @@ static struct wireaddr *read_addresses(const tal_t *ctx, const u8 *ser)
 			break;
 		}
 
-		tal_resize(&wireaddrs, numaddrs+1);
-		wireaddrs[numaddrs] = wireaddr;
-		numaddrs++;
+		*tal_arr_expand(&wireaddrs) = wireaddr;
 	}
 	return wireaddrs;
 }
@@ -1314,11 +1305,10 @@ bool routing_add_node_announcement(struct routing_state *rstate, const u8 *msg T
 	node->addresses = tal_steal(node, wireaddrs);
 
 	node->last_timestamp = timestamp;
-	memcpy(node->rgb_color, rgb_color, 3);
-	tal_free(node->alias);
-	node->alias = tal_dup_arr(node, u8, alias, 32, 0);
-	tal_free(node->gfeatures);
-	node->gfeatures = tal_steal(node, features);
+	memcpy(node->rgb_color, rgb_color, ARRAY_SIZE(node->rgb_color));
+	memcpy(node->alias, alias, ARRAY_SIZE(node->alias));
+	tal_free(node->globalfeatures);
+	node->globalfeatures = tal_steal(node, features);
 
 	tal_free(node->node_announcement);
 	node->node_announcement = tal_dup_arr(node, u8, msg, tal_count(msg), 0);

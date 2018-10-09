@@ -9,13 +9,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 
 - JSON API: `listpeers` has new field `scratch_txid`: the latest tx in channel.
+- JSON API: `listpeers` has new array `htlcs`: the current live payments.
 - JSON API: `listchannels` has two new fields: `message_flags` and `channel_flags`. This replaces `flags`.
 - Groestlcoind: more parallelism in requests, for very slow nodes.
 - Testing: fixed logging, cleaner interception of groestlcoind, minor fixes.
+- JSON API: `invoice` now adds route hint to invoices for incoming capacity (RouteBoost), and warns if insufficient capacity.
 
 ### Changed
 
 - Protocol: `channel_update` sent to disable channel only if we reject an HTLC.
+- Protocol: we don't send redundant `node_announcement` on every new channel.
 
 ### Deprecated
 
@@ -23,6 +26,7 @@ Note: You should always set `allow-deprecated-apis=false` to test for
 changes.
 
 - JSON RPC: `listchannels`' `flags` field. This has been split into two fields, see Added.
+- JSON RPC: `global_features` and `local_features` fields: use `globalfeatures` and `localfeatures` as per BOLT #1.
 
 ### Removed
 
@@ -32,7 +36,10 @@ changes.
 - JSON RPC: `getinfo` now shows correct Tor port.
 - JSON RPC: `ping` now works even after one peer fails to respond.
 - JSON RPC: `getroute` `fuzzpercent` and `pay` `maxfeepercent` can now be > 100.
+- JSON RPC: `riskfactor` in `pay` and `getroute` no longer always treated as 1.
 - Protocol: fix occasional deadlock when both peers flood with gossip.
+- Protocol: fix occasional long delay on sending `reply_short_channel_ids_end`.
+- Protocol: re-send `node_announcement` when address/alias/color etc change.
 
 ### Security
 

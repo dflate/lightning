@@ -70,6 +70,11 @@ def sync_blockheight(bitcoind, nodes):
         wait_for(lambda: n.rpc.getinfo()['blockheight'] == height)
 
 
+def wait_channel_quiescent(n1, n2):
+    wait_for(lambda: only_one(only_one(n1.rpc.listpeers(n2.info['id'])['peers'])['channels'])['htlcs'] == [])
+    wait_for(lambda: only_one(only_one(n2.rpc.listpeers(n1.info['id'])['peers'])['channels'])['htlcs'] == [])
+
+
 class TailableProc(object):
     """A monitorable process that we can start, stop and tail.
 
@@ -511,14 +516,14 @@ class LightningNode(object):
 
         # We wait until gossipd sees both local updates, as well as status NORMAL,
         # so it can definitely route through.
-        self.daemon.wait_for_logs(['update for channel {}\(0\) now ACTIVE'
+        self.daemon.wait_for_logs([r'update for channel {}\(0\) now ACTIVE'
                                    .format(scid),
-                                   'update for channel {}\(1\) now ACTIVE'
+                                   r'update for channel {}\(1\) now ACTIVE'
                                    .format(scid),
                                    'to CHANNELD_NORMAL'])
-        l2.daemon.wait_for_logs(['update for channel {}\(0\) now ACTIVE'
+        l2.daemon.wait_for_logs([r'update for channel {}\(0\) now ACTIVE'
                                  .format(scid),
-                                 'update for channel {}\(1\) now ACTIVE'
+                                 r'update for channel {}\(1\) now ACTIVE'
                                  .format(scid),
                                  'to CHANNELD_NORMAL'])
         return scid
@@ -641,7 +646,7 @@ class LightningNode(object):
             r = self.daemon.wait_for_log('Broadcasting {} .* to resolve '
                                          .format(name))
 
-        rawtx = re.search('.* \(([0-9a-fA-F]*)\) ', r).group(1)
+        rawtx = re.search(r'.* \(([0-9a-fA-F]*)\) ', r).group(1)
         txid = self.bitcoin.rpc.decoderawtransaction(rawtx, True)['txid']
 
         wait_for(lambda: txid in self.bitcoin.rpc.getrawmempool())
@@ -671,6 +676,7 @@ class NodeFactory(object):
             'may_fail',
             'may_reconnect',
             'random_hsm',
+            'log_all_io',
         ]
         node_opts = {k: v for k, v in opts.items() if k in node_opt_keys}
         cli_opts = {k: v for k, v in opts.items() if k not in node_opt_keys}

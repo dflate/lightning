@@ -243,7 +243,7 @@ check-makefile:
 
 # Any mention of BOLT# must be followed by an exact quote, modulo whitespace.
 bolt-check/%: % bolt-precheck tools/check-bolt
-	@if [ -d .tmp.lightningrfc ]; then tools/check-bolt .tmp.lightningrfc $<; else Not checking BOLTs: BOLTDIR $(BOLTDIR) does not exist >&2; fi
+	@if [ -d .tmp.lightningrfc ]; then tools/check-bolt .tmp.lightningrfc $<; else echo "Not checking BOLTs: BOLTDIR $(BOLTDIR) does not exist" >&2; fi
 
 LOCAL_BOLTDIR=.tmp.lightningrfc
 
@@ -285,7 +285,7 @@ check-cppcheck: .cppcheck-suppress
 	@trap 'rm -f .cppcheck-suppress' 0; git ls-files -- "*.c" "*.h" | grep -vE '^ccan/' | xargs cppcheck -q --language=c --std=c11 --error-exitcode=1 --suppressions-list=.cppcheck-suppress
 
 check-shellcheck:
-	git ls-files -- "*.sh" | xargs shellcheck
+	@git ls-files -- "*.sh" | xargs shellcheck
 
 check-setup_locale:
 	@tools/check-setup_locale.sh

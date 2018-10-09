@@ -126,16 +126,13 @@ static char *opt_add_addr_withtype(const char *arg,
 				   enum addr_listen_announce ala,
 				   bool wildcard_ok)
 {
-	size_t n = tal_count(ld->proposed_wireaddr);
 	char const *err_msg;
 
 	assert(arg != NULL);
 
-	tal_resize(&ld->proposed_wireaddr, n+1);
-	tal_resize(&ld->proposed_listen_announce, n+1);
-	ld->proposed_listen_announce[n] = ala;
-
-	if (!parse_wireaddr_internal(arg, &ld->proposed_wireaddr[n], ld->portnum,
+	*tal_arr_expand(&ld->proposed_listen_announce) = ala;
+	if (!parse_wireaddr_internal(arg, tal_arr_expand(&ld->proposed_wireaddr),
+				     ld->portnum,
 				     wildcard_ok, !ld->use_proxy_always, false,
 				     &err_msg)) {
 		return tal_fmt(NULL, "Unable to parse address '%s': %s", arg, err_msg);
@@ -415,7 +412,7 @@ static void dev_register_opts(struct lightningd *ld)
 	opt_register_noarg("--dev-allow-localhost", opt_set_bool,
 			   &ld->dev_allow_localhost,
 			   "Announce and allow announcments for localhost address");
-	opt_register_arg("--dev-bitcoind-poll", opt_set_u32, opt_show_u32,
+	opt_register_arg("--dev-groestlcoind-poll", opt_set_u32, opt_show_u32,
 			 &ld->topology->poll_seconds,
 			 "Time between polling for new transactions");
 	opt_register_arg("--dev-max-fee-multiplier", opt_set_u32, opt_show_u32,
@@ -784,16 +781,16 @@ void setup_color_and_alias(struct lightningd *ld)
 		adjective %= ARRAY_SIZE(codename_adjective);
 
 		/* Only use 32 characters */
-		name = tal_fmt(ld, "%s%s-",
+		name = tal_fmt(ld, "%s%s",
 			       codename_adjective[adjective],
 			       codename_noun[noun]);
 #if DEVELOPER
 		assert(strlen(name) < 32);
-		int taillen = 32 - strlen(name);
+		int taillen = 31 - strlen(name);
 		if (taillen > strlen(version()))
 			taillen = strlen(version());
 		/* Fit as much of end of version() as possible */
-		tal_append_fmt(&name, "%s",
+		tal_append_fmt(&name, "-%s",
 			       version() + strlen(version()) - taillen);
 #endif
 		assert(strlen(name) <= 32);

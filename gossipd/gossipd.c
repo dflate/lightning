@@ -1,3 +1,4 @@
+#include <ccan/array_size/array_size.h>
 #include <ccan/asort/asort.h>
 #include <ccan/build_assert/build_assert.h>
 #include <ccan/cast/cast.h>
@@ -84,7 +85,7 @@ struct daemon {
 	/* Global features to list in node_announcement. */
 	u8 *globalfeatures;
 
-	u8 alias[33];
+	u8 alias[32];
 	u8 rgb[3];
 
 	/* What we can actually announce. */
@@ -338,13 +339,49 @@ static void send_node_announcement(struct daemon *daemon)
 			      tal_hex(tmpctx, err));
 }
 
+/* Return true if the only change would be the timestamp. */
+static bool node_announcement_redundant(struct daemon *daemon)
+{
+	struct node *n = get_node(daemon->rstate, &daemon->id);
+	if (!n)
+		return false;
+
+	if (n->last_timestamp == -1)
+		return false;
+
+	if (tal_count(n->addresses) != tal_count(daemon->announcable))
+		return false;
+
+	for (size_t i = 0; i < tal_count(n->addresses); i++)
+		if (!wireaddr_eq(&n->addresses[i], &daemon->announcable[i]))
+			return false;
+
+	BUILD_ASSERT(ARRAY_SIZE(daemon->alias) == ARRAY_SIZE(n->alias));
+	if (!memeq(daemon->alias, ARRAY_SIZE(daemon->alias),
+		   n->alias, ARRAY_SIZE(n->alias)))
+		return false;
+
+	BUILD_ASSERT(ARRAY_SIZE(daemon->rgb) == ARRAY_SIZE(n->rgb_color));
+	if (!memeq(daemon->rgb, ARRAY_SIZE(daemon->rgb),
+		   n->rgb_color, ARRAY_SIZE(n->rgb_color)))
+		return false;
+
+	if (!memeq(daemon->globalfeatures, tal_count(daemon->globalfeatures),
+		   n->globalfeatures, tal_count(n->globalfeatures)))
+		return false;
+
+	return true;
+}
+
 /* Should we announce our own node? */
 static void maybe_send_own_node_announce(struct daemon *daemon)
 {
 	if (!daemon->rstate->local_channel_announced)
 		return;
 
-	/* FIXME: We may not need to retransmit here, if previous still valid. */
+	if (node_announcement_redundant(daemon))
+		return;
+
 	send_node_announcement(daemon);
 	daemon->rstate->local_channel_announced = false;
 }
@@ -745,15 +782,6 @@ static void handle_reply_channel_range(struct peer *peer, u8 *msg)
 	peer->query_channel_blocks = tal_free(peer->query_channel_blocks);
 }
 
-/* We keep a simple array of node ids while we're sending channel info */
-static void append_query_node(struct peer *peer, const struct pubkey *id)
-{
-	size_t n;
-	n = tal_count(peer->scid_query_nodes);
-	tal_resize(&peer->scid_query_nodes, n+1);
-	peer->scid_query_nodes[n] = *id;
-}
-
 /* Arbitrary ordering function of pubkeys.
  *
  * Note that we could use memcmp() here: even if they had somehow different
@@ -809,7 +837,7 @@ static bool create_next_scid_reply(struct peer *peer)
 		struct chan *chan;
 
 		chan = get_channel(rstate, &peer->scid_queries[i]);
-		if (!chan || !is_chan_public(chan))
+		if (!chan || !is_chan_announced(chan))
 			continue;
 
 		queue_peer_msg(peer, chan->channel_announce);
@@ -819,8 +847,8 @@ static bool create_next_scid_reply(struct peer *peer)
 			queue_peer_msg(peer, chan->half[1].channel_update);
 
 		/* Record node ids for later transmission of node_announcement */
-		append_query_node(peer, &chan->nodes[0]->id);
-		append_query_node(peer, &chan->nodes[1]->id);
+		*tal_arr_expand(&peer->scid_query_nodes) = chan->nodes[0]->id;
+		*tal_arr_expand(&peer->scid_query_nodes) = chan->nodes[1]->id;
 		sent = true;
 	}
 
@@ -841,7 +869,7 @@ static bool create_next_scid_reply(struct peer *peer)
 		const struct node *n;
 
 		n = get_node(rstate, &peer->scid_query_nodes[i]);
-		if (!n || !n->node_announcement || !n->node_announcement_index)
+		if (!n || !n->node_announcement_index)
 			continue;
 
 		queue_peer_msg(peer, n->node_announcement);
@@ -865,6 +893,7 @@ static bool create_next_scid_reply(struct peer *peer)
 							     &rstate->chain_hash,
 							     true);
 		queue_peer_msg(peer, take(end));
+		sent = true;
 		peer->scid_queries = tal_free(peer->scid_queries);
 		peer->scid_query_idx = 0;
 		peer->scid_query_nodes = tal_free(peer->scid_query_nodes);
@@ -1311,16 +1340,18 @@ static struct io_plan *getroute_req(struct io_conn *conn, struct daemon *daemon,
 	double fuzz;
 	struct siphash_seed seed;
 
-	fromwire_gossip_getroute_request(msg,
-					 &source, &destination,
-					 &msatoshi, &riskfactor, &final_cltv,
-					 &fuzz, &seed);
+	if (!fromwire_gossip_getroute_request(msg,
+					      &source, &destination,
+					      &msatoshi, &riskfactor,
+					      &final_cltv, &fuzz, &seed))
+		master_badmsg(WIRE_GOSSIP_GETROUTE_REQUEST, msg);
+
 	status_trace("Trying to find a route from %s to %s for %"PRIu64" msatoshi",
 		     pubkey_to_hexstr(tmpctx, &source),
 		     pubkey_to_hexstr(tmpctx, &destination), msatoshi);
 
 	hops = get_route(tmpctx, daemon->rstate, &source, &destination,
-			 msatoshi, 1, final_cltv,
+			 msatoshi, riskfactor, final_cltv,
 			 fuzz, &seed);
 
 	out = towire_gossip_getroute_reply(msg, hops);
@@ -1334,14 +1365,11 @@ static void append_half_channel(struct gossip_getchannels_entry **entries,
 {
 	const struct half_chan *c = &chan->half[idx];
 	struct gossip_getchannels_entry *e;
-	size_t n;
 
 	if (!is_halfchan_defined(c))
 		return;
 
-	n = tal_count(*entries);
-	tal_resize(entries, n+1);
-	e = &(*entries)[n];
+	e = tal_arr_expand(entries);
 
 	e->source = chan->nodes[idx]->id;
 	e->destination = chan->nodes[!idx]->id;
@@ -1372,7 +1400,8 @@ static struct io_plan *getchannels_req(struct io_conn *conn, struct daemon *daem
 	struct chan *chan;
 	struct short_channel_id *scid;
 
-	fromwire_gossip_getchannels_request(msg, msg, &scid);
+	if (!fromwire_gossip_getchannels_request(msg, msg, &scid))
+		master_badmsg(WIRE_GOSSIP_GETCHANNELS_REQUEST, msg);
 
 	entries = tal_arr(tmpctx, struct gossip_getchannels_entry, 0);
 	if (scid) {
@@ -1394,30 +1423,25 @@ static struct io_plan *getchannels_req(struct io_conn *conn, struct daemon *daem
 	return daemon_conn_read_next(conn, &daemon->master);
 }
 
-static void append_node(const struct gossip_getnodes_entry ***nodes,
-			const struct pubkey *nodeid,
-			const u8 *gfeatures,
-			/* If non-NULL, contains more information */
+/* We keep pointers into n, assuming it won't change! */
+static void append_node(const struct gossip_getnodes_entry ***entries,
 			const struct node *n)
 {
-	struct gossip_getnodes_entry *new;
-	size_t num_nodes = tal_count(*nodes);
+	struct gossip_getnodes_entry *e;
 
-	new = tal(*nodes, struct gossip_getnodes_entry);
-	new->nodeid = *nodeid;
-	new->global_features = tal_dup_arr(*nodes, u8, gfeatures,
-					   tal_count(gfeatures), 0);
-	if (!n || n->last_timestamp < 0) {
-		new->last_timestamp = -1;
-		new->addresses = NULL;
-	} else {
-		new->last_timestamp = n->last_timestamp;
-		new->addresses = n->addresses;
-		new->alias = n->alias;
-		memcpy(new->color, n->rgb_color, 3);
-	}
-	tal_resize(nodes, num_nodes + 1);
-	(*nodes)[num_nodes] = new;
+	*tal_arr_expand(entries) = e
+		= tal(*entries, struct gossip_getnodes_entry);
+	e->nodeid = n->id;
+	e->last_timestamp = n->last_timestamp;
+	if (e->last_timestamp < 0)
+		return;
+
+	e->globalfeatures = n->globalfeatures;
+	e->addresses = n->addresses;
+	BUILD_ASSERT(ARRAY_SIZE(e->alias) == ARRAY_SIZE(n->alias));
+	BUILD_ASSERT(ARRAY_SIZE(e->color) == ARRAY_SIZE(n->rgb_color));
+	memcpy(e->alias, n->alias, ARRAY_SIZE(e->alias));
+	memcpy(e->color, n->rgb_color, ARRAY_SIZE(e->color));
 }
 
 static struct io_plan *getnodes(struct io_conn *conn, struct daemon *daemon,
@@ -1428,18 +1452,19 @@ static struct io_plan *getnodes(struct io_conn *conn, struct daemon *daemon,
 	const struct gossip_getnodes_entry **nodes;
 	struct pubkey *id;
 
-	fromwire_gossip_getnodes_request(tmpctx, msg, &id);
+	if (!fromwire_gossip_getnodes_request(tmpctx, msg, &id))
+		master_badmsg(WIRE_GOSSIP_GETNODES_REQUEST, msg);
 
 	nodes = tal_arr(tmpctx, const struct gossip_getnodes_entry *, 0);
 	if (id) {
 		n = get_node(daemon->rstate, id);
 		if (n)
-			append_node(&nodes, id, n->gfeatures, n);
+			append_node(&nodes, n);
 	} else {
 		struct node_map_iter i;
 		n = node_map_first(daemon->rstate->nodes, &i);
 		while (n != NULL) {
-			append_node(&nodes, &n->id, n->gfeatures, n);
+			append_node(&nodes, n);
 			n = node_map_next(daemon->rstate->nodes, &i);
 		}
 	}
@@ -1493,6 +1518,43 @@ static struct io_plan *ping_req(struct io_conn *conn, struct daemon *daemon,
 		peer->num_pings_outstanding++;
 
 out:
+	return daemon_conn_read_next(conn, &daemon->master);
+}
+
+static struct io_plan *get_incoming_channels(struct io_conn *conn,
+					     struct daemon *daemon,
+					     const u8 *msg)
+{
+	struct node *node;
+	struct route_info *r = tal_arr(tmpctx, struct route_info, 0);
+
+	if (!fromwire_gossip_get_incoming_channels(msg))
+		master_badmsg(WIRE_GOSSIP_GET_INCOMING_CHANNELS, msg);
+
+	node = get_node(daemon->rstate, &daemon->rstate->local_id);
+	if (node) {
+		for (size_t i = 0; i < tal_count(node->chans); i++) {
+			const struct chan *c = node->chans[i];
+			const struct half_chan *hc;
+			struct route_info *ri;
+
+			hc = &c->half[half_chan_to(node, c)];
+
+			if (!is_halfchan_enabled(hc))
+				continue;
+
+			ri = tal_arr_expand(&r);
+			ri->pubkey = other_node(node, c)->id;
+			ri->short_channel_id = c->scid;
+			ri->fee_base_msat = hc->base_fee;
+			ri->fee_proportional_millionths = hc->proportional_fee;
+			ri->cltv_expiry_delta = hc->delay;
+		}
+	}
+
+	msg = towire_gossip_get_incoming_channels_reply(NULL, r);
+	daemon_conn_send(&daemon->master, take(msg));
+
 	return daemon_conn_read_next(conn, &daemon->master);
 }
 
@@ -1731,14 +1793,13 @@ static void gossip_refresh_network(struct daemon *daemon)
 static void gossip_disable_local_channels(struct daemon *daemon)
 {
 	struct node *local_node = get_node(daemon->rstate, &daemon->id);
-	size_t i;
 
 	/* We don't have a local_node, so we don't have any channels yet
 	 * either */
 	if (!local_node)
 		return;
 
-	for (i = 0; i < tal_count(local_node->chans); i++)
+	for (size_t i = 0; i < tal_count(local_node->chans); i++)
 		local_node->chans[i]->local_disabled = true;
 }
 
@@ -1769,6 +1830,10 @@ static struct io_plan *gossip_init(struct daemon_conn *master,
 
 	/* Now disable all local channels, they can't be connected yet. */
 	gossip_disable_local_channels(daemon);
+
+	/* If that announced channels, we can announce ourselves (options
+	 * or addresses might have changed!) */
+	maybe_send_own_node_announce(daemon);
 
 	new_reltimer(&daemon->timers, daemon,
 		     time_from_sec(daemon->rstate->prune_timeout/4),
@@ -1952,6 +2017,10 @@ static struct io_plan *recv_req(struct io_conn *conn, struct daemon_conn *master
 	case WIRE_GOSSIP_PING:
 		return ping_req(conn, daemon, daemon->master.msg_in);
 
+	case WIRE_GOSSIP_GET_INCOMING_CHANNELS:
+		return get_incoming_channels(conn, daemon,
+					     daemon->master.msg_in);
+
 #if DEVELOPER
 	case WIRE_GOSSIP_QUERY_SCIDS:
 		return query_scids_req(conn, daemon, daemon->master.msg_in);
@@ -1985,6 +2054,7 @@ static struct io_plan *recv_req(struct io_conn *conn, struct daemon_conn *master
 	case WIRE_GOSSIP_SCIDS_REPLY:
 	case WIRE_GOSSIP_QUERY_CHANNEL_RANGE_REPLY:
 	case WIRE_GOSSIP_RESOLVE_CHANNEL_REPLY:
+	case WIRE_GOSSIP_GET_INCOMING_CHANNELS_REPLY:
 	case WIRE_GOSSIP_GET_UPDATE:
 	case WIRE_GOSSIP_GET_UPDATE_REPLY:
 	case WIRE_GOSSIP_SEND_GOSSIP:

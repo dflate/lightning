@@ -306,7 +306,7 @@ def test_reconnect_gossiping(node_factory):
     l1.rpc.connect(l2.info['id'], 'localhost', l2.port)
 
     l2.rpc.ping(l1.info['id'], 1, 65532)
-    l1.daemon.wait_for_log('Forgetting peer')
+    wait_for(lambda: l1.rpc.listpeers(l2.info['id'])['peers'] == [])
 
     l1.rpc.connect(l2.info['id'], 'localhost', l2.port)
     l2.daemon.wait_for_log('processing now old peer gone')
@@ -389,7 +389,7 @@ def test_reconnect_sender_add1(node_factory):
     rhash = l2.rpc.invoice(amt, 'test_reconnect_sender_add1', 'desc')['payment_hash']
     assert only_one(l2.rpc.listinvoices('test_reconnect_sender_add1')['invoices'])['status'] == 'unpaid'
 
-    route = [{'msatoshi': amt, 'id': l2.info['id'], 'delay': 5, 'channel': '1:1:1'}]
+    route = [{'mgro': amt, 'id': l2.info['id'], 'delay': 5, 'channel': '1:1:1'}]
 
     for i in range(0, len(disconnects)):
         l1.rpc.sendpay(route, rhash)
@@ -424,7 +424,7 @@ def test_reconnect_sender_add(node_factory):
     rhash = l2.rpc.invoice(amt, 'testpayment', 'desc')['payment_hash']
     assert only_one(l2.rpc.listinvoices('testpayment')['invoices'])['status'] == 'unpaid'
 
-    route = [{'msatoshi': amt, 'id': l2.info['id'], 'delay': 5, 'channel': '1:1:1'}]
+    route = [{'mgro': amt, 'id': l2.info['id'], 'delay': 5, 'channel': '1:1:1'}]
 
     # This will send commit, so will reconnect as required.
     l1.rpc.sendpay(route, rhash)
@@ -453,7 +453,7 @@ def test_reconnect_receiver_add(node_factory):
     rhash = l2.rpc.invoice(amt, 'testpayment2', 'desc')['payment_hash']
     assert only_one(l2.rpc.listinvoices('testpayment2')['invoices'])['status'] == 'unpaid'
 
-    route = [{'msatoshi': amt, 'id': l2.info['id'], 'delay': 5, 'channel': '1:1:1'}]
+    route = [{'gro': amt, 'id': l2.info['id'], 'delay': 5, 'channel': '1:1:1'}]
     l1.rpc.sendpay(route, rhash)
     for i in range(len(disconnects)):
         l1.daemon.wait_for_log('Already have funding locked in')
@@ -485,7 +485,7 @@ def test_reconnect_receiver_fulfill(node_factory):
     rhash = l2.rpc.invoice(amt, 'testpayment2', 'desc')['payment_hash']
     assert only_one(l2.rpc.listinvoices('testpayment2')['invoices'])['status'] == 'unpaid'
 
-    route = [{'msatoshi': amt, 'id': l2.info['id'], 'delay': 5, 'channel': '1:1:1'}]
+    route = [{'mgro': amt, 'id': l2.info['id'], 'delay': 5, 'channel': '1:1:1'}]
     l1.rpc.sendpay(route, rhash)
     for i in range(len(disconnects)):
         l1.daemon.wait_for_log('Already have funding locked in')
@@ -947,7 +947,7 @@ def test_update_fee_reconnect(node_factory, bitcoind):
     l2.daemon.wait_for_log('onchaind complete, forgetting peer')
 
 
-@unittest.skipIf(not DEVELOPER, "Too slow without --dev-bitcoind-poll")
+@unittest.skipIf(not DEVELOPER, "Too slow without --dev-groestlcoind-poll")
 def test_multiple_channels(node_factory):
     l1 = node_factory.get_node()
     l2 = node_factory.get_node()
@@ -1001,8 +1001,8 @@ def test_peerinfo(node_factory, bitcoind):
     # Gossiping but no node announcement yet
     assert l1.rpc.getpeer(l2.info['id'])['connected']
     assert len(l1.rpc.getpeer(l2.info['id'])['channels']) == 0
-    assert l1.rpc.getpeer(l2.info['id'])['local_features'] == '8a'
-    assert l1.rpc.getpeer(l2.info['id'])['global_features'] == ''
+    assert l1.rpc.getpeer(l2.info['id'])['localfeatures'] == '8a'
+    assert l1.rpc.getpeer(l2.info['id'])['globalfeatures'] == ''
 
     # Fund a channel to force a node announcement
     chan = l1.fund_channel(l2, 10**6)
@@ -1016,24 +1016,27 @@ def test_peerinfo(node_factory, bitcoind):
     nodes2 = l2.rpc.listnodes(l2.info['id'])['nodes']
     peer1 = l1.rpc.getpeer(l2.info['id'])
     peer2 = l2.rpc.getpeer(l1.info['id'])
-    assert only_one(nodes1)['global_features'] == peer1['global_features']
-    assert only_one(nodes2)['global_features'] == peer2['global_features']
+    assert only_one(nodes1)['globalfeatures'] == peer1['globalfeatures']
+    assert only_one(nodes2)['globalfeatures'] == peer2['globalfeatures']
 
-    assert l1.rpc.getpeer(l2.info['id'])['local_features'] == '8a'
-    assert l2.rpc.getpeer(l1.info['id'])['local_features'] == '8a'
+    assert l1.rpc.getpeer(l2.info['id'])['localfeatures'] == '8a'
+    assert l2.rpc.getpeer(l1.info['id'])['localfeatures'] == '8a'
 
     # If it reconnects after db load, it should know features.
     l1.restart()
     bitcoind.generate_block(1)
     wait_for(lambda: l1.rpc.getpeer(l2.info['id'])['connected'])
     wait_for(lambda: l2.rpc.getpeer(l1.info['id'])['connected'])
-    assert l1.rpc.getpeer(l2.info['id'])['local_features'] == '8a'
-    assert l2.rpc.getpeer(l1.info['id'])['local_features'] == '8a'
+    assert l1.rpc.getpeer(l2.info['id'])['localfeatures'] == '8a'
+    assert l2.rpc.getpeer(l1.info['id'])['localfeatures'] == '8a'
 
     # Close the channel to forget the peer
     with pytest.raises(RpcError, match=r'Channel close negotiation not finished'):
         l1.rpc.close(chan, False, 0)
 
+    wait_for(lambda: not only_one(l1.rpc.listpeers(l2.info['id'])['peers'])['connected'])
+    wait_for(lambda: not only_one(l2.rpc.listpeers(l1.info['id'])['peers'])['connected'])
+    
     l1.daemon.wait_for_log('Forgetting peer')
 
     count = bitcoind.rpc.getblockchaininfo()['blocks']
@@ -1046,6 +1049,7 @@ def test_peerinfo(node_factory, bitcoind):
         bitcoind.generate_block(1)
 
     assert not (bitcoind.rpc.getblockchaininfo()['blocks'] < (100 + count))
+
 
     l1.daemon.wait_for_log('WIRE_ONCHAIN_ALL_IRREVOCABLY_RESOLVED')
     l2.daemon.wait_for_log('WIRE_ONCHAIN_ALL_IRREVOCABLY_RESOLVED')

@@ -400,11 +400,11 @@ def test_withdraw(node_factory, bitcoind):
 
     waddr = 'grsrt1qccn808860ygrqq98e6ltplxu8hvjk08ngwkdpr'
     with pytest.raises(RpcError):
-        l1.rpc.withdraw('xx1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx', 2 * amount)
+        l1.rpc.withdraw('xx1qccn808860ygrqq98e6ltplxu8hvjk08ngwkdpr', 2 * amount)
     with pytest.raises(RpcError):
-        l1.rpc.withdraw('tb1pw508d6qejxtdg4y5r3zarvary0c5xw7kdl9fad', 2 * amount)
+        l1.rpc.withdraw('tgrs1pcn808860ygrqq98e6ltplxu8hvjk08ngwkdpr', 2 * amount)
     with pytest.raises(RpcError):
-        l1.rpc.withdraw('tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxxxxxx', 2 * amount)
+        l1.rpc.withdraw('tgrs1qccn808860ygrqq98e6ltplxu8hvjk08nxxxxxx', 2 * amount)
     l1.rpc.withdraw(waddr, 2 * amount)
     l1.bitcoin.rpc.generate(1)
     # Now make sure additional two of them were marked as spent
@@ -414,11 +414,11 @@ def test_withdraw(node_factory, bitcoind):
     # FIXME GENERATE REAL P2WSH ADDR
     waddr = 'grsrt1qpc4mnd3zfzjnyyyxj97yxcastjh7cx7m3ex6pn33quse9qleqsjsnakslv'
     with pytest.raises(RpcError):
-        l1.rpc.withdraw('xx1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3q0sl5k7', 2 * amount)
+        l1.rpc.withdraw('xx1qpc4mnd3zfzjnyyyxj97yxcastjh7cx7m3ex6pn33quse9qleqsjsnakslv', 2 * amount)
     with pytest.raises(RpcError):
-        l1.rpc.withdraw('tb1prp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qsm03tq', 2 * amount)
+        l1.rpc.withdraw('tgrs1ppc4mnd3zfzjnyyyxj97yxcastjh7cx7m3ex6pn33quse9qleqsjsnakslv', 2 * amount)
     with pytest.raises(RpcError):
-        l1.rpc.withdraw('tb1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qxxxxxx', 2 * amount)
+        l1.rpc.withdraw('tgrs1qpc4mnd3zfzjnyyyxj97yxcastjh7cx7m3ex6pn33quse9qleqsjsxxxxxx', 2 * amount)
     l1.rpc.withdraw(waddr, 2 * amount)
     l1.bitcoin.rpc.generate(1)
     # Now make sure additional two of them were marked as spent
@@ -439,16 +439,16 @@ def test_withdraw(node_factory, bitcoind):
         l1.rpc.withdraw('1pzry9x0s0muk', 2 * amount)
     # Invalid witness version
     with pytest.raises(RpcError):
-        l1.rpc.withdraw('BC13W508D6QEJXTDG4Y5R3ZARVARY0C5XW7KN40WF2', 2 * amount)
+        l1.rpc.withdraw('GRS13W508D6QEJXTDG4Y5R3ZARVARY0C5XW7KN40WF2', 2 * amount)
     # Invalid program length for witness version 0 (per BIP141)
     with pytest.raises(RpcError):
-        l1.rpc.withdraw('BC1QR508D6QEJXTDG4Y5R3ZARVARYV98GJ9P', 2 * amount)
+        l1.rpc.withdraw('GRS1QR508D6QEJXTDG4Y5R3ZARVARYV98GJ9P', 2 * amount)
     # Mixed case
     with pytest.raises(RpcError):
-        l1.rpc.withdraw('tb1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3q0sL5k7', 2 * amount)
+        l1.rpc.withdraw('tgrs1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3q0sL5k7', 2 * amount)
     # Non-zero padding in 8-to-5 conversion
     with pytest.raises(RpcError):
-        l1.rpc.withdraw('tb1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3pjxtptv', 2 * amount)
+        l1.rpc.withdraw('tgrs1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3pjxtptv', 2 * amount)
 
     # Should have 6 outputs available.
     assert l1.db_query('SELECT COUNT(*) as c FROM outputs WHERE status=0')[0]['c'] == 6
@@ -871,15 +871,15 @@ def test_feerates(node_factory):
     l1.start()
 
     # Query feerates (shouldn't give any!)
+    wait_for(lambda: len(l1.rpc.feerates('perkw')['perkw']) == 2)
     feerates = l1.rpc.feerates('perkw')
-    assert len(feerates['perkw']) == 2
     assert feerates['warning'] == 'Some fee estimates unavailable: groestlcoind startup?'
     assert 'perkb' not in feerates
     assert feerates['perkw']['max_acceptable'] == 2**32 - 1
     assert feerates['perkw']['min_acceptable'] == 253
 
+    wait_for(lambda: len(l1.rpc.feerates('perkb')['perkb']) == 2)
     feerates = l1.rpc.feerates('perkb')
-    assert len(feerates['perkb']) == 2
     assert feerates['warning'] == 'Some fee estimates unavailable: groestlcoind startup?'
     assert 'perkw' not in feerates
     assert feerates['perkb']['max_acceptable'] == (2**32 - 1)
@@ -887,8 +887,8 @@ def test_feerates(node_factory):
 
     # Now try setting them, one at a time.
     l1.set_feerates((15000, 0, 0), True)
+    wait_for(lambda: len(l1.rpc.feerates('perkw')['perkw']) == 3)
     feerates = l1.rpc.feerates('perkw')
-    assert len(feerates['perkw']) == 3
     assert feerates['perkw']['urgent'] == 15000
     assert feerates['warning'] == 'Some fee estimates unavailable: groestlcoind startup?'
     assert 'perkb' not in feerates
@@ -896,8 +896,8 @@ def test_feerates(node_factory):
     assert feerates['perkw']['min_acceptable'] == 253
 
     l1.set_feerates((15000, 6250, 0), True)
+    wait_for(lambda: len(l1.rpc.feerates('perkb')['perkb']) == 4)
     feerates = l1.rpc.feerates('perkb')
-    assert len(feerates['perkb']) == 4
     assert feerates['perkb']['urgent'] == 15000 * 4
     assert feerates['perkb']['normal'] == 25000
     assert feerates['warning'] == 'Some fee estimates unavailable: groestlcoind startup?'
@@ -906,8 +906,8 @@ def test_feerates(node_factory):
     assert feerates['perkb']['min_acceptable'] == 253 * 4
 
     l1.set_feerates((15000, 6250, 5000), True)
+    wait_for(lambda: len(l1.rpc.feerates('perkw')['perkw']) == 5)
     feerates = l1.rpc.feerates('perkw')
-    assert len(feerates['perkw']) == 5
     assert feerates['perkw']['urgent'] == 15000
     assert feerates['perkw']['normal'] == 25000 // 4
     assert feerates['perkw']['slow'] == 5000
@@ -947,8 +947,8 @@ def test_logging(node_factory):
     wait_for(check_new_log)
 
 
-@unittest.skipIf(VALGRIND and not DEVELOPER,
-                 "Backtrace upsets valgrind: only suppressed in DEVELOPER mode")
+@unittest.skipIf(VALGRIND,
+                 "Valgrind sometimes fails assert on injected SEGV")
 def test_crashlog(node_factory):
     l1 = node_factory.get_node(may_fail=True)
 

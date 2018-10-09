@@ -4,14 +4,21 @@ from time import time
 from tqdm import tqdm
 
 
-import logging
 import pytest
 import random
-import utils
-import time
+import time 
 
 
-num_payments = 1000
+num_workers = 10
+num_payments = 100
+
+
+@pytest.fixture
+def executor():
+    ex = futures.ThreadPoolExecutor(max_workers=num_workers)
+    yield ex
+    ex.shutdown(wait=False)
+
 
 def test_single_hop(node_factory, executor):
     l1, l2 = node_factory.line_graph(2, fundchannel=True)
@@ -43,7 +50,7 @@ def test_single_hop(node_factory, executor):
 
 
 def test_single_payment(node_factory, benchmark):
-    l1, l2 = node_factory.line_graph(2, fundchannel=True)
+    l1, l2 = node_factory.line_graph(2)
 
     def do_pay(l1, l2):
         invoice = l2.rpc.invoice(1000, 'invoice-{}'.format(random.random()), 'desc')['bolt11']
@@ -62,7 +69,8 @@ def test_invoice(node_factory, benchmark):
 
 
 def test_pay(node_factory, benchmark):
-    l1, l2 = node_factory.line_graph(2, fundchannel=True)
+    l1, l2 = node_factory.line_graph(2)
+
     invoices = []
     for _ in range(1, num_payments):
         invoice = l2.rpc.invoice(1000, 'invoice-{}'.format(random.random()), 'desc')['bolt11']

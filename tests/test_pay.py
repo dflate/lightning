@@ -506,7 +506,7 @@ def test_decodepay(node_factory):
     assert b11['description'] == 'Please consider supporting this project'
     assert b11['expiry'] == 3600
     assert b11['payee'] == '03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad'
-    
+
     # BOLT #11:
     # > ### Please send $3 for a cup of coffee to the same peer, within 1 minute
     # > lnbc2500u1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdq5xysxxatsyp3k7enxv4jsxqzpuaztrnwngzn3kdzw5hydlzf03qdgm2hdq27cqv3agm2awhz5se903vruatfhq77w3ls4evs3ch9zw97j25emudupq63nyw24cg27h2rspfj9srp
@@ -543,7 +543,7 @@ def test_decodepay(node_factory):
         l1.rpc.decodepay('1111111')
 
 
-@unittest.skipIf(not DEVELOPER, "Too slow without --dev-bitcoind-poll")
+@unittest.skipIf(not DEVELOPER, "Too slow without --dev-groestlcoind-poll")
 def test_forward(node_factory, bitcoind):
     # Connect 1 -> 2 -> 3.
     l1, l2, l3 = node_factory.line_graph(3, fundchannel=True)
