@@ -22,7 +22,7 @@
 #include <wire/wire.h>
 #include <wire/wire_sync.h>
 
-/* 1000 * 10^8 millisatoshi == 1 bitcoin */
+/* 1000 * 10^8 millisatoshi == 1 groestlcoin */
 #define MSAT_PER_BTC 100000000000ULL
 
 struct multiplier {
@@ -325,7 +325,7 @@ static char *decode_f(struct bolt11 *b11,
 
         /* BOLT #11:
          *
-         * For bitcoin payments, a writer MUST set an `f` field to a
+         * For groestlcoin payments, a writer MUST set an `f` field to a
          * valid witness version and program, or `17` followed by a
          * public key hash, or `18` followed by a script hash. */
         if (version == 17) {
@@ -467,11 +467,11 @@ struct bolt11 *bolt11_decode(const tal_t *ctx, const char *str,
 
         b11->routes = tal_arr(b11, struct route_info *, 0);
 
-        if (strlen(str) < 8)
-                return decode_fail(b11, fail, "Bad bech32 string");
+        if (!strstarts(str, "ln"))
+                return decode_fail(b11, fail, "Invoices must start with ln");
 
-        hrp = tal_arr(tmpctx, char, strlen(str) - 6);
-        data = tal_arr(tmpctx, u5, strlen(str) - 8);
+        hrp = tal_arr(tmpctx, char, strlen(str));
+        data = tal_arr(tmpctx, u5, strlen(str));
 
         if (!bech32_decode(hrp, data, &data_len, str, (size_t)-1))
                 return decode_fail(b11, fail, "Bad bech32 string");
@@ -483,8 +483,8 @@ struct bolt11 *bolt11_decode(const tal_t *ctx, const char *str,
          *
          * The human-readable part of a Lightning invoice consists of two
 	 * sections:
-	 * 1. `prefix`: `ln` + BIP-0173 currency prefix (e.g. `lnbc` for bitcoin
-	 *     mainnet, `lntb` for bitcoin testnet and `lnbcrt` for bitcoin
+	 * 1. `prefix`: `ln` + BIP-0173 currency prefix (e.g. `lngrs` for groestlcoin
+	 *     mainnet, `lntgrs` for groestlcoin testnet and `lngrsrt` for groestlcoin
 	 *     regtest)
          * 1. `amount`: optional number in that currency, followed by an optional
          *    `multiplier` letter
@@ -803,7 +803,7 @@ static void encode_f(u5 **data, const u8 *fallback)
 
         /* BOLT #11:
          *
-         * For bitcoin payments, a writer MUST set an `f` field to a valid
+         * For groestlcoin payments, a writer MUST set an `f` field to a valid
          * witness version and program, or `17` followed by a public key hash,
          * or `18` followed by a script hash.
          */

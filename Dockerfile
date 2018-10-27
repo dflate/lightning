@@ -21,7 +21,7 @@ RUN apk add --no-cache \
 
 WORKDIR /opt
 
-ENV GROESTLCOIN_VERSION 2.16.0
+ENV GROESTLCOIN_VERSION 2.16.3
 ENV GROESTLCOIN_URL https://github.com/Groestlcoin/groestlcoin/releases/download/v2.16.3/groestlcoin-2.16.3-x86_64-linux-gnu.tar.gz
 ENV GROESTLCOIN_SHA256 f15bd5e38b25a103821f1563cd0e1b2cf7146ec9f9835493a30bd57313d3b86f
 

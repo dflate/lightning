@@ -169,7 +169,7 @@ static void send_offer(struct crypto_state *cs,
 
 	/* BOLT #2:
 	 *
-	 *   - MUST set `signature` to the Bitcoin signature of the close
+	 *   - MUST set `signature` to the Groestlcoin signature of the close
 	 *     transaction, as specified in [BOLT
 	 *     #3](03-transactions.md#closing-transaction).
 	 */

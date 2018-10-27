@@ -39,10 +39,14 @@ TIMEOUT = int(os.getenv("TIMEOUT", "120"))
 VALGRIND = os.getenv("VALGRIND", config['VALGRIND']) == "1"
 
 
-def wait_for(success, timeout=TIMEOUT, interval=0.1):
+def wait_for(success, timeout=TIMEOUT):
     start_time = time.time()
+    interval = 0.25
     while not success() and time.time() < start_time + timeout:
         time.sleep(interval)
+        interval *= 2
+        if interval > 5:
+            interval = 5
     if time.time() > start_time + timeout:
         raise ValueError("Error waiting for {}", success)
 
@@ -376,8 +380,12 @@ class LightningNode(object):
         self.may_fail = may_fail
         self.may_reconnect = may_reconnect
 
-    def openchannel(self, remote_node, capacity, addrtype="p2sh-segwit", confirm=True, announce=True):
+    def openchannel(self, remote_node, capacity, addrtype="p2sh-segwit", confirm=True, announce=True, connect=True):
         addr, wallettxid = self.fundwallet(10 * capacity, addrtype)
+
+        if connect and remote_node.info['id'] not in [p['id'] for p in self.rpc.listpeers()['peers']]:
+            self.rpc.connect(remote_node.info['id'], '127.0.0.1', remote_node.daemon.port)
+
         fundingtx = self.rpc.fundchannel(remote_node.info['id'], capacity)
 
         # Wait for the funding transaction to be in bitcoind's mempool
@@ -570,7 +578,7 @@ class LightningNode(object):
         wait_for(lambda: txid in self.bitcoin.rpc.getrawmempool())
 
     def wait_channel_active(self, chanid):
-        wait_for(lambda: self.is_channel_active(chanid), interval=1)
+        wait_for(lambda: self.is_channel_active(chanid))
 
     # This waits until gossipd sees channel_update in both directions
     # (or for local channels, at least a local announcement)
@@ -611,7 +619,7 @@ class LightningNode(object):
     # Note: this feeds through the smoother in update_feerate, so changing
     # it on a running daemon may not give expected result!
     def set_feerates(self, feerates, wait_for_effect=True):
-        # (bitcoind returns bitcoin per kb, so these are * 4)
+        # (groestlcoind returns groestlcoin per kb, so these are * 4)
 
         def mock_estimatesmartfee(r):
             params = r['params']
@@ -804,10 +812,12 @@ class NodeFactory(object):
 
         # Confirm all channels and wait for them to become usable
         bitcoin.generate_block(1)
+        scids = []
         for src, dst in connections:
             wait_for(lambda: src.channel_state(dst) == 'CHANNELD_NORMAL')
             scid = src.get_channel_scid(dst)
             src.daemon.wait_for_log(r'Received channel_update for channel {scid}\(.\) now ACTIVE'.format(scid=scid))
+            scids.append(scid)
 
         bitcoin.generate_block(1)
 
@@ -815,6 +825,21 @@ class NodeFactory(object):
             return nodes
 
         bitcoin.generate_block(5)
+
+        def both_dirs_ready(n, scid):
+            resp = n.rpc.listchannels(scid)
+            return [a['active'] for a in resp['channels']] == [True, True]
+
+        # Make sure everyone sees all channels: we can cheat and
+        # simply check the ends (since it's a line).
+        wait_for(lambda: both_dirs_ready(nodes[0], scids[-1]))
+        wait_for(lambda: both_dirs_ready(nodes[-1], scids[0]))
+
+        # Make sure we have all node announcements, too (just check ends)
+        for n in nodes:
+            for end in (nodes[0], nodes[-1]):
+                wait_for(lambda: 'alias' in only_one(end.rpc.listnodes(n.info['id'])['nodes']))
+
         return nodes
 
     def killall(self, expected_successes):

@@ -4,21 +4,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.6.2] - 2018-10-20: "The Consensus Loving Nasal Daemon"
+
+This release named by practicalswift.
 
 ### Added
 
 - JSON API: `listpeers` has new field `scratch_txid`: the latest tx in channel.
 - JSON API: `listpeers` has new array `htlcs`: the current live payments.
 - JSON API: `listchannels` has two new fields: `message_flags` and `channel_flags`. This replaces `flags`.
+- JSON API: `invoice` now adds route hint to invoices for incoming capacity (RouteBoost), and warns if insufficient capacity.
+- JSON API: `listforwards` lists all forwarded payments, their associated channels, and fees.
+- JSON API: `getinfo` shows forwarding fees earnt as `msatoshi_fees_collected`.
 - Groestlcoind: more parallelism in requests, for very slow nodes.
 - Testing: fixed logging, cleaner interception of groestlcoind, minor fixes.
-- JSON API: `invoice` now adds route hint to invoices for incoming capacity (RouteBoost), and warns if insufficient capacity.
+- Protocol: we set and handle the new `htlc_maximum_msat` channel_update field.
 
 ### Changed
 
 - Protocol: `channel_update` sent to disable channel only if we reject an HTLC.
 - Protocol: we don't send redundant `node_announcement` on every new channel.
+- Config: config file can override `lightning-dir` (makes sense with `--conf`).
+- Config: `--conf` option is now relative to current directory, not `lightning-dir`.
+- lightning-cli: `help <cmd>` prints basic information even if no man page found.
+- JSON API: `getinfo` now reports global statistics about forwarded payments, including total fees earned and amounts routed.
 
 ### Deprecated
 
@@ -33,13 +42,20 @@ changes.
 ### Fixed
 
 - Startup: more coherent complaint if daemon already running.
+- Lightningd: correctly save full HTLCs across restarts; fixup old databases.
 - JSON RPC: `getinfo` now shows correct Tor port.
 - JSON RPC: `ping` now works even after one peer fails to respond.
 - JSON RPC: `getroute` `fuzzpercent` and `pay` `maxfeepercent` can now be > 100.
 - JSON RPC: `riskfactor` in `pay` and `getroute` no longer always treated as 1.
+- JSON-RPC: `listpeers` was always reporting 0 for all stats.
+- JSON RPC: `withdraw all` says `Cannot afford transaction` if you have
+             absolutely no funds, rather than `Output 0 satoshis would be dust`.
+- Protocol: don't send gossip about closed channels.
 - Protocol: fix occasional deadlock when both peers flood with gossip.
 - Protocol: fix occasional long delay on sending `reply_short_channel_ids_end`.
 - Protocol: re-send `node_announcement` when address/alias/color etc change.
+- Protocol: multiple HTLCs with the same payment_hash are handled correctly.
+- Options: 'autotor' defaults to port 9051 if not specified.
 
 ### Security
 
@@ -169,7 +185,8 @@ There predate the BOLT specifications, and are only of vague historic interest:
 6. [0.5.1] - 2016-10-21
 7. [0.5.2] - 2016-11-21: "Bitcoin Savings & Trust Daily Interest II"
 
-[Unreleased]: https://github.com/ElementsProject/lightning/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/ElementsProject/lightning/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/ElementsProject/lightning/releases/tag/v0.6.2
 [0.6.1]: https://github.com/ElementsProject/lightning/releases/tag/v0.6.1
 [0.6]: https://github.com/ElementsProject/lightning/releases/tag/v0.6
 [0.5.2]: https://github.com/ElementsProject/lightning/releases/tag/v0.5.2-2016-11-21

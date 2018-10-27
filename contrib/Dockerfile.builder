@@ -2,7 +2,7 @@ FROM ubuntu:16.04
 MAINTAINER Christian Decker <decker.christian@gmail.com>
 
 ENV DEBIAN_FRONTEND noninteractive
-ENV GROESTLCOIN_VERSION 2.16.0
+ENV GROESTLCOIN_VERSION 2.16.3
 
 WORKDIR /build
 
@@ -45,7 +45,7 @@ ENV LC_ALL=en_US.UTF-8
 RUN locale-gen en_US.UTF-8 && dpkg-reconfigure locales
 
 RUN cd /tmp/ && \
-    wget https://github.com/Groestlcoin/groestlcoin/releases/download/v2.16.0/groestlcoin-2.16.0-x86_64-linux-gnu.tar.gz -O groestlcoin.tar.gz && \
+    wget https://github.com/Groestlcoin/groestlcoin/releases/download/v2.16.3/groestlcoin-2.16.3-x86_64-linux-gnu.tar.gz -O groestlcoin.tar.gz && \
     tar -xvzf groestlcoin.tar.gz && \
     mv /tmp/groestlcoin-$GROESTLCOIN_VERSION/bin/groestlcoin* /usr/local/bin/ && \
     rm -rf groestlcoin.tar.gz /tmp/groestlcoin-$GROESTLCOIN_VERSION

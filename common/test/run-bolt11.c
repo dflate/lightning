@@ -146,7 +146,7 @@ int main(void)
 	 *
 	 * Breakdown:
 	 *
-	 * * `lnbc`: prefix, lightning on bitcoin mainnet
+	 * * `lngrs`: prefix, lightning on groestlcoin mainnet
 	 * * `1`: Bech32 separator
 	 * * `pvjluez`: timestamp (1496314658)
 	 * * `p`: payment hash
@@ -177,7 +177,7 @@ int main(void)
 	 *
 	 * Breakdown:
 	 *
-	 * * `lnbc`: prefix, lightning on bitcoin mainnet
+	 * * `lngrs`: prefix, lightning on groestlcoin mainnet
 	 * * `2500u`: amount (2500 micro-bitcoin)
 	 * * `1`: Bech32 separator
 	 * * `pvjluez`: timestamp (1496314658)
@@ -212,7 +212,7 @@ int main(void)
 	 *
 	 * Breakdown:
 	 *
-	 * * `lnbc`: prefix, lightning on bitcoin mainnet
+	 * * `lngrs`: prefix, lightning on groestlcoin mainnet
 	 * * `20m`: amount (20 milli-bitcoin)
 	 * * `1`: Bech32 separator
 	 * * `pvjluez`: timestamp (1496314658)

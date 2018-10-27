@@ -58,7 +58,7 @@ size_t measure_tx_weight(const struct bitcoin_tx *tx);
 struct bitcoin_tx *bitcoin_tx(const tal_t *ctx, varint_t input_count,
 			      varint_t output_count);
 
-/* This takes a raw bitcoin tx in hex. */
+/* This takes a raw groestlcoin tx in hex. */
 struct bitcoin_tx *bitcoin_tx_from_hex(const tal_t *ctx, const char *hex,
 				       size_t hexlen);
 

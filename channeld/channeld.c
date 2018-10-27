@@ -60,6 +60,7 @@
 #define PEER_FD 3
 #define GOSSIP_FD 4
 #define HSM_FD 5
+#define min(x, y) ((x) < (y) ? (x) : (y))
 
 struct commit_sigs {
 	struct peer *peer;
@@ -227,6 +228,25 @@ static const u8 *hsm_req(const tal_t *ctx, const u8 *req TAKES)
 	return msg;
 }
 
+/*
+ * The maximum msat that this node will accept for an htlc.
+ * It's flagged as an optional field in `channel_update`.
+ *
+ * We advertise the maximum value possible, defined as the smaller
+ * of the remote's maximum in-flight HTLC or the total channel
+ * capacity minus the cumulative reserve.
+ * FIXME: does this need fuzz?
+ */
+static const u64 advertised_htlc_max(const u64 funding_msat,
+		const struct channel_config *our_config,
+		const struct channel_config *remote_config)
+{
+	u64 cumulative_reserve_msat = (our_config->channel_reserve_satoshis +
+		remote_config->channel_reserve_satoshis) * 1000;
+	return min(remote_config->max_htlc_value_in_flight_msat,
+			funding_msat - cumulative_reserve_msat);
+}
+
 /* Create and send channel_update to gossipd (and maybe peer) */
 static void send_channel_update(struct peer *peer, int disable_flag)
 {
@@ -247,7 +267,11 @@ static void send_channel_update(struct peer *peer, int disable_flag)
 						 peer->cltv_delta,
 						 peer->conf[REMOTE].htlc_minimum_msat,
 						 peer->fee_base,
-						 peer->fee_per_satoshi);
+						 peer->fee_per_satoshi,
+						 advertised_htlc_max(
+							 peer->channel->funding_msat,
+							 &peer->conf[LOCAL],
+							 &peer->conf[REMOTE]));
 	wire_sync_write(GOSSIP_FD, take(msg));
 }
 
@@ -313,7 +337,7 @@ static void send_announcement_signatures(struct peer *peer)
 		 * unique, unlike the channel update which may have
 		 * been replaced in the meantime. */
 		status_failed(STATUS_FAIL_HSM_IO,
-			      "HSM returned an invalid bitcoin signature");
+			      "HSM returned an invalid groestlcoin signature");
 	}
 
 	msg = towire_announcement_signatures(
@@ -560,7 +584,7 @@ static void handle_peer_feechange(struct peer *peer, const u8 *msg)
 	 *
 	 * A receiving node:
 	 *...
-	 *  - if the sender is not responsible for paying the Bitcoin fee:
+	 *  - if the sender is not responsible for paying the Groestlcoin fee:
 	 *    - MUST fail the channel.
 	 */
 	if (peer->channel->funder != REMOTE)
@@ -1630,7 +1654,9 @@ static void peer_in(struct peer *peer, const u8 *msg)
 	if (!peer->funding_locked[REMOTE]) {
 		if (type != WIRE_FUNDING_LOCKED
 		    && type != WIRE_PONG
-		    && type != WIRE_SHUTDOWN) {
+		    && type != WIRE_SHUTDOWN
+		    /* lnd sends this early; it's harmless. */
+		    && type != WIRE_ANNOUNCEMENT_SIGNATURES) {
 			peer_failed(&peer->cs,
 				    &peer->channel_id,
 				    "%s (%u) before funding locked",
@@ -1940,6 +1966,7 @@ static void check_current_dataloss_fields(struct peer *peer,
 			    type_to_string(tmpctx, struct secret,
 					   &old_commit_secret));
 
+#if 0 /* FIXME: This isn't reliable! */
 	/* FIXME: We don't keep really old per_commit numbers, so we can't
 	 * check this 'needs retransmit' case! */
 	if (next_remote_revocation_number == peer->next_index[REMOTE]) {
@@ -1963,6 +1990,7 @@ static void check_current_dataloss_fields(struct peer *peer,
 					    remote_current_per_commitment_point),
 			     next_remote_revocation_number,
 			     peer->next_index[REMOTE]);
+#endif
 
 	status_trace("option_data_loss_protect: fields are correct");
 }
@@ -2302,7 +2330,6 @@ static void handle_offer_htlc(struct peer *peer, const u8 *inmsg)
 
 	/* FIXME: Fuzz the boundaries a bit to avoid probing? */
 	case CHANNEL_ERR_MAX_HTLC_VALUE_EXCEEDED:
-		/* FIXME: We should advertise this? */
 		failcode = WIRE_TEMPORARY_CHANNEL_FAILURE;
 		failmsg = tal_fmt(inmsg, "Maximum value exceeded");
 		goto failed;
@@ -2312,7 +2339,7 @@ static void handle_offer_htlc(struct peer *peer, const u8 *inmsg)
 		goto failed;
 	case CHANNEL_ERR_HTLC_BELOW_MINIMUM:
 		failcode = WIRE_AMOUNT_BELOW_MINIMUM;
-		failmsg = tal_fmt(inmsg, "HTLC too small (%u minimum)",
+		failmsg = tal_fmt(inmsg, "HTLC too small (%"PRIu64" minimum)",
 				  htlc_minimum_msat(peer->channel, REMOTE));
 		goto failed;
 	case CHANNEL_ERR_TOO_MANY_HTLCS:
@@ -2339,7 +2366,7 @@ static void handle_feerates(struct peer *peer, const u8 *inmsg)
 
 	/* BOLT #2:
 	 *
-	 * The node _responsible_ for paying the Bitcoin fee:
+	 * The node _responsible_ for paying the Groestlcoin fee:
 	 *   - SHOULD send `update_fee` to ensure the current fee rate is
 	 *    sufficient (by a significant margin) for timely processing of the
 	 *     commitment transaction.
@@ -2350,7 +2377,7 @@ static void handle_feerates(struct peer *peer, const u8 *inmsg)
 	} else {
 		/* BOLT #2:
 		 *
-		 * The node _not responsible_ for paying the Bitcoin fee:
+		 * The node _not responsible_ for paying the Groestlcoin fee:
 		 *  - MUST NOT send `update_fee`.
 		 */
 		/* FIXME: We could drop to chain if fees are too low, but

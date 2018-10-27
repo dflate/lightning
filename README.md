@@ -127,7 +127,7 @@ cli/lightning-cli fundchannel <node_id> <amount_in_gro>
 
 This opens a connection and, on top of that connection, then opens
 a channel.
-The funding transaction needs 1 confirmations in order for the channel
+The funding transaction needs 1 confirmation in order for the channel
 to be usable, and 6 to be broadcast for others to use.
 You can check the status of the channel using `cli/lightning-cli
 listpeers`, which after 3 confirmations (1 on testnet) should say
@@ -193,7 +193,7 @@ Command line options will always override the values in the configuration
 file.
 
 To use a configuration file, create a file named "config" within your
-".lightning" directory. Usually this will be ~/.lightning/config
+".lightning" directory. Usually, this will be ~/.lightning/config
 
 Configuration options are set using a key=value pair on each line of
 the file, for example:

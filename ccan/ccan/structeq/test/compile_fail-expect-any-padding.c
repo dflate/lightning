@@ -2,11 +2,12 @@
 
 struct mydata {
 	int start, end;
+	int pad;
 };
 #ifdef FAIL
-#define PADDING -1
+#define PADDING -1 /* We have more than 1 byte padding */
 #else
-#define PADDING 0
+#define PADDING sizeof(int)
 #endif
 
 STRUCTEQ_DEF(mydata, PADDING, start, end);

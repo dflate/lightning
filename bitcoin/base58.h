@@ -24,7 +24,7 @@ struct bitcoin_address;
  * 58^51 < 2^302, but 58^52 > 2^302.  So 52 digits, plus one terminator. */
 #define BASE58_KEY_MAX_LEN 53
 
-/* Bitcoin address encoded in base58, with version and checksum */
+/* Groestlcoin address encoded in base58, with version and checksum */
 char *bitcoin_to_base58(const tal_t *ctx, bool test_net,
 			const struct bitcoin_address *addr);
 bool bitcoin_from_base58(bool *test_net,

@@ -5,7 +5,6 @@
 #include <ccan/mem/mem.h>
 #include <ccan/tal/str/str.h>
 #include <channeld/gen_channel_wire.h>
-#include <common/json_escaped.h>
 #include <common/overflows.h>
 #include <common/sphinx.h>
 #include <common/timeout.h>
@@ -13,6 +12,7 @@
 #include <lightningd/chaintopology.h>
 #include <lightningd/htlc_end.h>
 #include <lightningd/json.h>
+#include <lightningd/json_escaped.h>
 #include <lightningd/jsonrpc.h>
 #include <lightningd/jsonrpc_errors.h>
 #include <lightningd/lightningd.h>
@@ -62,10 +62,10 @@ static bool htlc_in_update_state(struct channel *channel,
 		return false;
 
 	wallet_htlc_update(channel->peer->ld->wallet,
-			   hin->dbid, newstate, hin->preimage);
+			   hin->dbid, newstate, hin->preimage,
+			   hin->failcode, hin->failuremsg);
 
 	hin->hstate = newstate;
-	htlc_in_check(hin, __func__);
 	return true;
 }
 
@@ -78,10 +78,9 @@ static bool htlc_out_update_state(struct channel *channel,
 		return false;
 
 	wallet_htlc_update(channel->peer->ld->wallet, hout->dbid, newstate,
-			   NULL);
+			   hout->preimage, hout->failcode, hout->failuremsg);
 
 	hout->hstate = newstate;
-	htlc_out_check(hout, __func__);
 	return true;
 }
 
@@ -101,11 +100,10 @@ static void fail_in_htlc(struct htlc_in *hin,
 	/* We need this set, since we send it to channeld. */
 	if (hin->failcode & UPDATE)
 		hin->failoutchannel = *out_channelid;
-	else
-		memset(&hin->failoutchannel, 0, sizeof(hin->failoutchannel));
 
 	/* We update state now to signal it's in progress, for persistence. */
 	htlc_in_update_state(hin->key.channel, hin, SENT_REMOVE_HTLC);
+	htlc_in_check(hin, __func__);
 
 	/* Tell peer, if we can. */
 	if (!hin->key.channel->owner)
@@ -141,11 +139,11 @@ static void fail_out_htlc(struct htlc_out *hout, const char *localfail)
 {
 	htlc_out_check(hout, __func__);
 	assert(hout->failcode || hout->failuremsg);
-	if (hout->in) {
+	if (hout->am_origin) {
+		payment_failed(hout->key.channel->peer->ld, hout, localfail);
+	} else if (hout->in) {
 		fail_in_htlc(hout->in, hout->failcode, hout->failuremsg,
 			     hout->key.channel->scid);
-	} else {
-		payment_failed(hout->key.channel->peer->ld, hout, localfail);
 	}
 }
 
@@ -215,10 +213,12 @@ static void fulfill_htlc(struct htlc_in *hin, const struct preimage *preimage)
 	struct wallet *wallet = channel->peer->ld->wallet;
 
 	hin->preimage = tal_dup(hin, struct preimage, preimage);
-	htlc_in_check(hin, __func__);
 
 	/* We update state now to signal it's in progress, for persistence. */
 	htlc_in_update_state(channel, hin, SENT_REMOVE_HTLC);
+
+	htlc_in_check(hin, __func__);
+
 	/* Update channel stats */
 	wallet_channel_stats_incr_in_fulfilled(wallet,
 					       channel->dbid,
@@ -351,6 +351,12 @@ static void destroy_hout_subd_died(struct htlc_out *hout)
 		  hout->key.id);
 
 	hout->failcode = WIRE_TEMPORARY_CHANNEL_FAILURE;
+
+	/* Assign a temporary state (we're about to free it!) so checks
+	 * are happy that it has a failure code */
+	assert(hout->hstate == SENT_ADD_HTLC);
+	hout->hstate = RCVD_REMOVE_HTLC;
+
 	fail_out_htlc(hout, "Outgoing subdaemon died");
 }
 
@@ -375,13 +381,13 @@ static void rcvd_htlc_reply(struct subd *subd, const u8 *msg, const int *fds UNU
 
 	if (failure_code) {
 		hout->failcode = (enum onion_type) failure_code;
-		if (!hout->in) {
+		if (hout->am_origin) {
 			char *localfail = tal_fmt(msg, "%s: %.*s",
 						  onion_type_name(failure_code),
 						  (int)tal_count(failurestr),
 						  (const char *)failurestr);
 			payment_failed(ld, hout, localfail);
-		} else
+		} else if (hout->in)
 			local_fail_htlc(hout->in, failure_code,
 					hout->key.channel->scid);
 		/* Prevent hout from being failed twice. */
@@ -445,7 +451,7 @@ enum onion_type send_htlc_out(struct channel *out, u64 amount, u32 cltv,
 
 	/* Make peer's daemon own it, catch if it dies. */
 	hout = new_htlc_out(out->owner, out, amount, cltv,
-			    payment_hash, onion_routing_packet, in);
+			    payment_hash, onion_routing_packet, in == NULL, in);
 	tal_add_destructor(hout, destroy_hout_subd_died);
 
 	/* Give channel 30 seconds to commit (first) htlc. */
@@ -563,30 +569,18 @@ struct gossip_resolve {
 static void channel_resolve_reply(struct subd *gossip, const u8 *msg,
 				  const int *fds UNUSED, struct gossip_resolve *gr)
 {
-	struct pubkey *nodes, *peer_id;
+	struct pubkey *peer_id;
 
-	if (!fromwire_gossip_resolve_channel_reply(msg, msg, &nodes)) {
+	if (!fromwire_gossip_get_channel_peer_reply(msg, msg, &peer_id)) {
 		log_broken(gossip->log,
-			   "bad fromwire_gossip_resolve_channel_reply %s",
+			   "bad fromwire_gossip_get_channel_peer_reply %s",
 			   tal_hex(msg, msg));
 		return;
 	}
 
-	if (tal_count(nodes) == 0) {
+	if (!peer_id) {
 		local_fail_htlc(gr->hin, WIRE_UNKNOWN_NEXT_PEER, NULL);
 		return;
-	} else if (tal_count(nodes) != 2) {
-		log_broken(gossip->log,
-			   "fromwire_gossip_resolve_channel_reply has %zu nodes",
-			   tal_count(nodes));
-		return;
-	}
-
-	/* Get the other peer matching the id that is not us */
-	if (pubkey_cmp(&nodes[0], &gossip->ld->id) == 0) {
-		peer_id = &nodes[1];
-	} else {
-		peer_id = &nodes[0];
 	}
 
 	forward_htlc(gr->hin, gr->hin->cltv_expiry,
@@ -615,6 +609,7 @@ static bool peer_accepted_htlc(struct channel *channel,
 
 	if (!htlc_in_update_state(channel, hin, RCVD_ADD_ACK_REVOCATION))
 		return false;
+	htlc_in_check(hin, __func__);
 
 #if DEVELOPER
 	if (channel->peer->ignore_htlcs) {
@@ -690,8 +685,7 @@ static bool peer_accepted_htlc(struct channel *channel,
 		gr->outgoing_cltv_value = rs->hop_data.outgoing_cltv;
 		gr->hin = hin;
 
-		req = towire_gossip_resolve_channel_request(tmpctx,
-							    &gr->next_channel);
+		req = towire_gossip_get_channel_peer(tmpctx, &gr->next_channel);
 		log_debug(channel->log, "Asking gossip to resolve channel %s",
 			  type_to_string(tmpctx, struct short_channel_id,
 					 &gr->next_channel));
@@ -719,16 +713,20 @@ static void fulfill_our_htlc_out(struct channel *channel, struct htlc_out *hout,
 	hout->preimage = tal_dup(hout, struct preimage, preimage);
 	htlc_out_check(hout, __func__);
 
-	wallet_htlc_update(ld->wallet, hout->dbid, hout->hstate, preimage);
+	wallet_htlc_update(ld->wallet, hout->dbid, hout->hstate,
+			   hout->preimage, hout->failcode, hout->failuremsg);
 	/* Update channel stats */
 	wallet_channel_stats_incr_out_fulfilled(ld->wallet,
 						channel->dbid,
 						hout->msatoshi);
 
-	if (hout->in)
-		fulfill_htlc(hout->in, preimage);
-	else
+	if (hout->am_origin)
 		payment_succeeded(ld, hout, preimage);
+	else if (hout->in) {
+		fulfill_htlc(hout->in, preimage);
+		wallet_forwarded_payment_add(ld->wallet, hout->in, hout,
+					     FORWARD_SETTLED);
+	}
 }
 
 static bool peer_fulfilled_our_htlc(struct channel *channel,
@@ -779,8 +777,11 @@ void onchain_fulfilled_htlc(struct channel *channel,
 
 		/* We may have already fulfilled before going onchain, or
 		 * we can fulfill onchain multiple times. */
-		if (!hout->preimage)
+		if (!hout->preimage) {
+			/* Force state to something which allows a preimage */
+			hout->hstate = RCVD_REMOVE_HTLC;
 			fulfill_our_htlc_out(channel, hout, preimage);
+		}
 
 		/* We keep going: this is something of a leak, but onchain
 		 * we have no real way of distinguishing HTLCs anyway */
@@ -815,31 +816,11 @@ static bool peer_failed_our_htlc(struct channel *channel,
 	log_debug(channel->log, "Our HTLC %"PRIu64" failed (%u)", failed->id,
 		  hout->failcode);
 	htlc_out_check(hout, __func__);
+
+	if (hout->in)
+		wallet_forwarded_payment_add(ld->wallet, hout->in, hout, FORWARD_FAILED);
+
 	return true;
-}
-
-/* FIXME: Crazy slow! */
-struct htlc_out *find_htlc_out_by_ripemd(const struct channel *channel,
-					 const struct ripemd160 *ripemd)
-{
-	struct htlc_out_map_iter outi;
-	struct htlc_out *hout;
-	struct lightningd *ld = channel->peer->ld;
-
-	for (hout = htlc_out_map_first(&ld->htlcs_out, &outi);
-	     hout;
-	     hout = htlc_out_map_next(&ld->htlcs_out, &outi)) {
-		struct ripemd160 hash;
-
-		if (hout->key.channel != channel)
-			continue;
-
-		ripemd160(&hash,
-			  &hout->payment_hash, sizeof(hout->payment_hash));
-		if (ripemd160_eq(&hash, ripemd))
-			return hout;
-	}
-	return NULL;
 }
 
 void onchain_failed_our_htlc(const struct channel *channel,
@@ -847,22 +828,32 @@ void onchain_failed_our_htlc(const struct channel *channel,
 			     const char *why)
 {
 	struct lightningd *ld = channel->peer->ld;
-	struct htlc_out *hout = find_htlc_out_by_ripemd(channel, &htlc->ripemd);
+	struct htlc_out *hout;
 
-	/* Don't fail twice! */
-	if (hout->failuremsg || hout->failcode)
+	hout = find_htlc_out(&ld->htlcs_out, channel, htlc->id);
+	if (!hout)
+		return;
+
+	/* Don't fail twice (or if already succeeded)! */
+	if (hout->failuremsg || hout->failcode || hout->preimage)
 		return;
 
 	hout->failcode = WIRE_PERMANENT_CHANNEL_FAILURE;
 
-	if (!hout->in) {
+	/* Force state to something which expects a failure, and save to db */
+	hout->hstate = RCVD_REMOVE_HTLC;
+	htlc_out_check(hout, __func__);
+	wallet_htlc_update(ld->wallet, hout->dbid, hout->hstate,
+			   hout->preimage, hout->failcode, hout->failuremsg);
+
+	if (hout->am_origin) {
 		assert(why != NULL);
 		char *localfail = tal_fmt(channel, "%s: %s",
 					  onion_type_name(WIRE_PERMANENT_CHANNEL_FAILURE),
 					  why);
 		payment_failed(ld, hout, localfail);
 		tal_free(localfail);
-	} else
+	} else if (hout->in)
 		local_fail_htlc(hout->in, WIRE_PERMANENT_CHANNEL_FAILURE,
 				hout->key.channel->scid);
 }
@@ -932,6 +923,7 @@ static bool update_in_htlc(struct channel *channel,
 	if (!htlc_in_update_state(channel, hin, newstate))
 		return false;
 
+	htlc_in_check(hin, __func__);
 	if (newstate == SENT_REMOVE_ACK_REVOCATION)
 		remove_htlc_in(channel, hin);
 
@@ -956,6 +948,10 @@ static bool update_out_htlc(struct channel *channel,
 		wallet_channel_stats_incr_out_offered(ld->wallet,
 						      channel->dbid,
 						      hout->msatoshi);
+
+		if (hout->in)
+			wallet_forwarded_payment_add(ld->wallet, hout->in, hout,
+						     FORWARD_OFFERED);
 
 		/* For our own HTLCs, we commit payment to db lazily */
 		if (hout->origin_htlc_id == 0)
@@ -1661,6 +1657,54 @@ void htlcs_notify_new_block(struct lightningd *ld, u32 height)
 	} while (removed);
 }
 
+#ifdef COMPAT_V061
+static void fixup_hout(struct lightningd *ld, struct htlc_out *hout)
+{
+	const char *fix;
+
+	/* We didn't save HTLC failure information to the database.  So when
+	 * busy nodes restarted (y'know, our most important users!) they would
+	 * find themselves with missing fields.
+	 *
+	 * Fortunately, most of the network is honest: re-sending an old HTLC
+	 * just causes failure (though we assert() when we try to push the
+	 * failure to the incoming HTLC which has already succeeded!).
+	 */
+
+	/* We care about HTLCs being removed only, not those being added. */
+	if (hout->hstate < RCVD_REMOVE_HTLC)
+		return;
+
+	/* Successful ones are fine. */
+	if (hout->preimage)
+		return;
+
+	/* Failed ones (only happens after db fixed!) OK. */
+	if (hout->failcode || hout->failuremsg)
+		return;
+
+	/* payment_preimage for HTLC in *was* stored, so look for that. */
+	if (hout->in && hout->in->preimage) {
+		hout->preimage = tal_dup(hout, struct preimage,
+					 hout->in->preimage);
+		fix = "restoring preimage from incoming HTLC";
+	} else {
+		hout->failcode = WIRE_TEMPORARY_CHANNEL_FAILURE;
+		fix = "subsituting temporary channel failure";
+	}
+
+	log_broken(ld->log, "HTLC #%"PRIu64" (%s) "
+		   " for amount %"PRIu64
+		   " to %s"
+		   " is missing a resolution: %s.",
+		   hout->key.id, htlc_state_name(hout->hstate),
+		   hout->msatoshi,
+		   type_to_string(tmpctx, struct pubkey,
+				  &hout->key.channel->peer->id),
+		   fix);
+}
+#endif /* COMPAT_V061 */
+
 /**
  * htlcs_reconnect -- Link outgoing HTLCs to their origins after initial db load
  *
@@ -1676,14 +1720,31 @@ void htlcs_reconnect(struct lightningd *ld,
 	struct htlc_out_map_iter outi;
 	struct htlc_in *hin;
 	struct htlc_out *hout;
+	struct htlc_in_map unprocessed;
+
+	/* Any HTLCs which happened to be incoming and weren't forwarded before
+	 * we shutdown/crashed: fail them now.
+	 *
+	 * Note that since we do local processing synchronously, so this never
+	 * captures local payments.  But if it did, it would be a tiny corner
+	 * case. */
+	htlc_in_map_init(&unprocessed);
+	for (hin = htlc_in_map_first(htlcs_in, &ini); hin;
+	     hin = htlc_in_map_next(htlcs_in, &ini)) {
+		if (hin->hstate == RCVD_ADD_ACK_REVOCATION)
+			htlc_in_map_add(&unprocessed, hin);
+	}
 
 	for (hout = htlc_out_map_first(htlcs_out, &outi); hout;
 	     hout = htlc_out_map_next(htlcs_out, &outi)) {
 
-		if (hout->origin_htlc_id == 0) {
+		if (hout->am_origin) {
 			continue;
 		}
 
+		/* For fulfilled HTLCs, we fulfill incoming before outgoing is
+		 * completely resolved, so it's possible that we don't find
+		 * the incoming. */
 		for (hin = htlc_in_map_first(htlcs_in, &ini); hin;
 		     hin = htlc_in_map_next(htlcs_in, &ini)) {
 			if (hout->origin_htlc_id == hin->dbid) {
@@ -1691,15 +1752,41 @@ void htlcs_reconnect(struct lightningd *ld,
 					  "Found corresponding htlc_in %" PRIu64
 					  " for htlc_out %" PRIu64,
 					  hin->dbid, hout->dbid);
-				hout->in = hin;
+				htlc_out_connect_htlc_in(hout, hin);
 				break;
 			}
 		}
 
-		if (!hout->in)
-			fatal("Unable to find corresponding htlc_in %"PRIu64" for htlc_out %"PRIu64,
+		if (!hout->in && !hout->preimage) {
+#ifdef COMPAT_V061
+			log_broken(ld->log,
+				   "Missing preimage for orphaned HTLC; replacing with zeros");
+			hout->preimage = talz(hout, struct preimage);
+#else
+			fatal("Unable to find corresponding htlc_in %"PRIu64
+			      " for unfulfilled htlc_out %"PRIu64,
 			      hout->origin_htlc_id, hout->dbid);
+#endif
+		}
+#ifdef COMPAT_V061
+		fixup_hout(ld, hout);
+#endif
+
+		if (hout->in)
+			htlc_in_map_del(&unprocessed, hout->in);
 	}
+
+	/* Now fail any which were stuck. */
+	for (hin = htlc_in_map_first(&unprocessed, &ini); hin;
+	     hin = htlc_in_map_next(&unprocessed, &ini)) {
+		log_unusual(hin->key.channel->log,
+			    "Failing old unprocessed HTLC #%"PRIu64,
+			    hin->key.id);
+		fail_in_htlc(hin, WIRE_TEMPORARY_NODE_FAILURE, NULL, NULL);
+	}
+
+	/* Don't leak memory! */
+	htlc_in_map_clear(&unprocessed);
 }
 
 
@@ -1735,3 +1822,49 @@ static const struct json_command dev_ignore_htlcs = {
 };
 AUTODATA(json_command, &dev_ignore_htlcs);
 #endif /* DEVELOPER */
+
+static void listforwardings_add_forwardings(struct json_stream *response, struct wallet *wallet)
+{
+	const struct forwarding *forwardings;
+	forwardings = wallet_forwarded_payments_get(wallet, tmpctx);
+
+	json_array_start(response, "forwards");
+	for (size_t i=0; i<tal_count(forwardings); i++) {
+		const struct forwarding *cur = &forwardings[i];
+		json_object_start(response, NULL);
+
+		json_add_short_channel_id(response, "in_channel", &cur->channel_in);
+		json_add_short_channel_id(response, "out_channel", &cur->channel_out);
+		json_add_num(response, "in_msatoshi", cur->msatoshi_in);
+		json_add_num(response, "out_msatoshi", cur->msatoshi_out);
+		json_add_num(response, "fee", cur->fee);
+		json_add_string(response, "status", forward_status_name(cur->status));
+		json_object_end(response);
+	}
+	json_array_end(response);
+
+	tal_free(forwardings);
+}
+
+static void json_listforwards(struct command *cmd, const char *buffer,
+			       const jsmntok_t *params)
+{
+	struct json_stream *response;
+
+	if (!param(cmd, buffer, params, NULL))
+		return;
+
+	response = json_stream_success(cmd);
+	json_object_start(response, NULL);
+	listforwardings_add_forwardings(response, cmd->ld->wallet);
+	json_object_end(response);
+
+	command_success(cmd, response);
+}
+
+static const struct json_command listforwards_command = {
+	"listforwards", json_listforwards,
+	"List all forwarded payments and their information", false,
+	"List all forwarded payments and their information"
+};
+AUTODATA(json_command, &listforwards_command);

@@ -6,7 +6,6 @@
 #include <ccan/container_of/container_of.h>
 #include <ccan/time/time.h>
 #include <ccan/timer/timer.h>
-#include <common/json_escaped.h>
 #include <lightningd/htlc_end.h>
 #include <stdio.h>
 #include <wallet/txfilter.h>
@@ -46,7 +45,7 @@ struct config {
 	u32 commit_time_ms;
 
 	/* How often to broadcast gossip (msec) */
-	u32 broadcast_interval;
+	u32 broadcast_interval_msec;
 
 	/* Channel update interval */
 	u32 channel_update_interval;

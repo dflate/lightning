@@ -1,6 +1,6 @@
 FROM fedora:28
 
-ENV GROESTLCOIN_VERSION 2.16.0
+ENV GROESTLCOIN_VERSION 2.16.3
 WORKDIR /tmp
 
 RUN dnf update -y && \
@@ -23,7 +23,7 @@ RUN dnf update -y && \
 		zlib-devel && \
 	dnf clean all
 
-RUN wget https://github.com/Groestlcoin/groestlcoin/releases/download/v2.16.0/groestlcoin-2.16.0-x86_64-linux-gnu.tar.gz -O groestlcoin.tar.gz && \
+RUN wget https://github.com/Groestlcoin/groestlcoin/releases/download/v2.16.3/groestlcoin-2.16.3-x86_64-linux-gnu.tar.gz -O groestlcoin.tar.gz && \
     tar -xvzf groestlcoin.tar.gz && \
     mv groestlcoin-$GROESTLCOIN_VERSION/bin/groestlcoin* /usr/local/bin/ && \
     rm -rf groestlcoin.tar.gz groestlcoin-$GROESTLCOIN_VERSION
