@@ -28,8 +28,7 @@ ENV GROESTLCOIN_SHA256 f15bd5e38b25a103821f1563cd0e1b2cf7146ec9f9835493a30bd5731
 RUN mkdir /opt/groestlcoin && cd /opt/groestlcoin \
     && wget -qO groestlcoin.tar.gz "$GROESTLCOIN_URL" \
     && echo "$GROESTLCOIN_SHA256  groestlcoin.tar.gz" | sha256sum -c - \
-    && BD=groestlcoin-$GROESTLCOIN_VERSION/bin \
-    && tar -xzvf groestlcoin.tar.gz $BD/groestlcoin-cli --strip-components=1 --exclude=*-qt \
+    && tar -xzvf groestlcoin.tar.gz groestlcoin-cli --strip-components=1 --exclude=*-qt \
     && rm groestlcoin.tar.gz
 
 ENV LIGHTNINGD_VERSION=master
@@ -73,7 +72,7 @@ VOLUME [ "/root/.lightning" ]
 
 COPY --from=builder /opt/lightningd/cli/lightning-cli /usr/bin
 COPY --from=builder /opt/lightningd/lightningd/lightning* /usr/bin/
-COPY --from=builder /opt/groestlcoin/bin /usr/bin
+COPY --from=builder /opt/groestlcoin /usr/bin
 COPY tools/docker-entrypoint.sh entrypoint.sh
 
 EXPOSE 9735 9835
