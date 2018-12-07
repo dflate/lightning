@@ -30,6 +30,8 @@ RUN mkdir /opt/groestlcoin && cd /opt/groestlcoin \
     && echo "$GROESTLCOIN_SHA256  groestlcoin.tar.gz" | sha256sum -c - \
     && tar -xzvf groestlcoin.tar.gz groestlcoin-cli --strip-components=1 --exclude=*-qt \
     && rm groestlcoin.tar.gz
+    
+RUN ls /opt/groestlcoin
 
 ENV LIGHTNINGD_VERSION=master
 
