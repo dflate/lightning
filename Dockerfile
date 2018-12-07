@@ -28,7 +28,7 @@ ENV GROESTLCOIN_SHA256 f15bd5e38b25a103821f1563cd0e1b2cf7146ec9f9835493a30bd5731
 RUN mkdir /opt/groestlcoin && cd /opt/groestlcoin \
     && wget -qO groestlcoin.tar.gz "$GROESTLCOIN_URL" \
     && echo "$GROESTLCOIN_SHA256  groestlcoin.tar.gz" | sha256sum -c - \
-    && tar -xzvf groestlcoin.tar.gz groestlcoin-cli --exclude=*-qt 
+    && tar -xzvf groestlcoin.tar.gz groestlcoin-cli --exclude=*-qt \
     && rm groestlcoin.tar.gz
     
 ENV LIGHTNINGD_VERSION=master
