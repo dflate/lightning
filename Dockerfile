@@ -67,6 +67,9 @@ ENV GLIBCBIN_SHA256 3a87874e57b9d92e223f3e90356aaea994af67fb76b71bb72abfb809e948
 ENV LIGHTNINGD_DATA=/root/.lightning
 ENV LIGHTNINGD_RPC_PORT=9835
 
+RUN mkdir $LIGHTNINGD_DATA && \
+    touch $LIGHTNINGD_DATA/config
+
 VOLUME [ "/root/.lightning" ]
 
 COPY --from=builder /opt/lightningd/cli/lightning-cli /usr/bin
