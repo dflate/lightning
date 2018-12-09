@@ -2,6 +2,11 @@
 
 : "${EXPOSE_TCP:=false}"
 
+if [[ -z "${LIGHTNINGD_OPT}" ]]; then
+  echo "${LIGHTNINGD_OPT}" > $LIGHTNINGD_DATA/config
+fi
+
+
 if [ "$EXPOSE_TCP" == "true" ]; then
     set -m
     lightningd "$@" &
