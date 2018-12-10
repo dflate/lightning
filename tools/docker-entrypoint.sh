@@ -2,9 +2,10 @@
 
 : "${EXPOSE_TCP:=false}"
 
-if [[ -z "${LIGHTNINGD_OPT}" ]]; then
-  echo "${LIGHTNINGD_OPT}" > $LIGHTNINGD_DATA/config
-fi
+cat <<-EOF > "$LIGHTNINGD_DATA/config"
+${LIGHTNINGD_OPT}
+EOF
+
 NETWORK=$(sed -n 's/^network=\(.*\)$/\1/p' < "$LIGHTNINGD_DATA/config")
 REPLACEDNETWORK="";
 if [ "$NETWORK" == "mainnet" ]; then
