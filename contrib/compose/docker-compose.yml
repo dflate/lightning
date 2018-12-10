@@ -32,9 +32,25 @@ services:
         network=${NETWORK:-regtest}
         alias=${LIGHTNING_ALIAS}
     volumes:
-    - "./clightning_groestlcoin_datadir:/root/.lightning"
+    - "clightning_groestlcoin_datadir:/root/.lightning"
     - "./groestlcoin_datadir:/etc/groestlcoin"
     ports:
     - "9735:9735"
     links:
     - groestlcoind
+  clightning_groestlcoin_spark:
+    image: shesek/spark-wallet
+    container_name: clightning_groestlcoin_spark
+    restart: unless-stopped
+    environment:
+      LOGIN: ${SPARK_LOGIN}
+      PORT: ${SPARK_WALLET_PORT}
+    links:
+    - clightning_groestlcoin
+    ports:
+    - "9876:${SPARK_WALLET_PORT}"
+    volumes:
+    - "clightning_groestlcoin_datadir:/etc/lightning"
+  
+volumes:
+  clightning_groestlcoin_datadir:
