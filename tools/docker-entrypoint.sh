@@ -17,7 +17,7 @@ if [[ $REPLACEDNETWORK ]]; then
     echo "Replaced network $NETWORK by $REPLACEDNETWORK in $LIGHTNINGD_DATA/config"
 fi
 
-if [[ $LIGHTNINGD_EXPLORERURL && $NETWORK ]]; then
+if [[ $LIGHTNINGD_EXPLORERURL && $LIGHTNINGD_NETWORK ]]; then
     # We need to do that because clightning behave weird if it starts at same time as bitcoin core, or if the node is not synched
     echo "Waiting for the node to start and sync"
     dotnet /opt/NBXplorer.NodeWaiter/NBXplorer.NodeWaiter.dll --chains "grs" --network "$NETWORK" --explorerurl "$LIGHTNINGD_EXPLORERURL"
