@@ -2,6 +2,21 @@
 
 : "${EXPOSE_TCP:=false}"
 
+cat <<-EOF > "$LIGHTNINGD_DATA/config"
+${LIGHTNINGD_OPT}
+EOF
+
+NETWORK=$(sed -n 's/^network=\(.*\)$/\1/p' < "$LIGHTNINGD_DATA/config")
+REPLACEDNETWORK="";
+if [ "$NETWORK" == "mainnet" ]; then
+	REPLACEDNETWORK="groestlcoin"
+fi
+if [[ $REPLACEDNETWORK ]]; then
+    sed -i '/^network=/d' "$LIGHTNINGD_DATA/config"
+    echo "network=$REPLACEDNETWORK" >> "$LIGHTNINGD_DATA/config"
+    echo "Replaced network $NETWORK by $REPLACEDNETWORK in $LIGHTNINGD_DATA/config"
+fi
+
 if [ "$EXPOSE_TCP" == "true" ]; then
     set -m
     lightningd "$@" &

@@ -32,3 +32,7 @@ test/test_sphinx
 tests/.pytest.restart
 gossip_store
 .pytest_cache
+
+contrib/compose/groestlcoin_datadir/
+
+contrib/compose/clightning_groestlcoin_datadir/
