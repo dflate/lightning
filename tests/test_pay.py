@@ -126,7 +126,7 @@ def test_pay_disconnect(node_factory, bitcoind):
 @unittest.skipIf(not DEVELOPER, "needs DEVELOPER=1 for dev_suppress_gossip")
 def test_pay_get_error_with_update(node_factory):
     """We should process an update inside a temporary_channel_failure"""
-    l1, l2, l3 = node_factory.line_graph(3, opts={'log-level': 'io'}, fundchannel=True, announce=True)
+    l1, l2, l3 = node_factory.line_graph(3, opts={'log-level': 'io'}, fundchannel=True, wait_for_announce=True)
     chanid2 = l2.get_channel_scid(l3)
 
     inv = l3.rpc.invoice(123000, 'test_pay_get_error_with_update', 'description')
@@ -179,7 +179,7 @@ def test_pay_optional_args(node_factory):
 
 
 @unittest.skipIf(not DEVELOPER, "needs DEVELOPER=1")
-def test_payment_success_persistence(node_factory, executor):
+def test_payment_success_persistence(node_factory, bitcoind, executor):
     # Start two nodes and open a channel.. die during payment.
     # Feerates identical so we don't get gratuitous commit to update them
     l1 = node_factory.get_node(disconnect=['+WIRE_COMMITMENT_SIGNED'],
@@ -216,7 +216,7 @@ def test_payment_success_persistence(node_factory, executor):
     assert len(invoices) == 1 and invoices[0]['status'] == 'paid'
 
     # FIXME: We should re-add pre-announced routes on startup!
-    l1.bitcoin.rpc.generate(5)
+    bitcoind.generate_block(5)
     l1.wait_channel_active(chanid)
 
     # A duplicate should succeed immediately (nop) and return correct preimage.
@@ -385,10 +385,10 @@ def test_sendpay(node_factory):
         p1 = l1.rpc.getpeer(l2.info['id'], 'info')
         p2 = l2.rpc.getpeer(l1.info['id'], 'info')
         return (
-            only_one(p1['channels'])['mgro_to_us'] == 10**6 * 1000 - amt and
-            only_one(p1['channels'])['mgro_total'] == 10**6 * 1000 and
-            only_one(p2['channels'])['mgro_to_us'] == amt and
-            only_one(p2['channels'])['mgro_total'] == 10**6 * 1000
+            only_one(p1['channels'])['mgro_to_us'] == 10**6 * 1000 - amt
+            and only_one(p1['channels'])['mgro_total'] == 10**6 * 1000
+            and only_one(p2['channels'])['mgro_to_us'] == amt
+            and only_one(p2['channels'])['mgro_total'] == 10**6 * 1000
         )
     wait_for(check_balances)
 
@@ -788,11 +788,11 @@ def test_forward_stats(node_factory, bitcoind):
 
     """
     amount = 10**5
-    l1, l2, l3 = node_factory.line_graph(3, announce=False)
+    l1, l2, l3 = node_factory.line_graph(3, wait_for_announce=False)
     l4 = node_factory.get_node()
     l5 = node_factory.get_node(may_fail=True)
-    l2.openchannel(l4, 10**6, announce=False)
-    l2.openchannel(l5, 10**6, announce=True)
+    l2.openchannel(l4, 10**6, wait_for_announce=False)
+    l2.openchannel(l5, 10**6, wait_for_announce=True)
 
     bitcoind.generate_block(5)
 
@@ -857,7 +857,7 @@ def test_htlcs_cltv_only_difference(node_factory, bitcoind):
     # l1 -> l2 -> l3 -> l4
     # l4 ignores htlcs, so they stay.
     # l3 will see a reconnect from l4 when l4 restarts.
-    l1, l2, l3, l4 = node_factory.line_graph(4, announce=True, opts=[{}] * 2 + [{'dev-no-reconnect': None, 'may_reconnect': True}] * 2)
+    l1, l2, l3, l4 = node_factory.line_graph(4, wait_for_announce=True, opts=[{}] * 2 + [{'dev-no-reconnect': None, 'may_reconnect': True}] * 2)
 
     h = l4.rpc.invoice(msatoshi=10**8, label='x', description='desc')['payment_hash']
     l4.rpc.dev_ignore_htlcs(id=l3.info['id'], ignore=True)
@@ -903,3 +903,22 @@ def test_htlcs_cltv_only_difference(node_factory, bitcoind):
     assert only_one(l1.rpc.listpeers(l2.info['id'])['peers'])['connected']
     assert only_one(l2.rpc.listpeers(l3.info['id'])['peers'])['connected']
     assert only_one(l3.rpc.listpeers(l4.info['id'])['peers'])['connected']
+
+
+def test_pay_variants(node_factory):
+    l1, l2 = node_factory.line_graph(2)
+
+    # Upper case is allowed
+    b11 = l2.rpc.invoice(123000, 'test_pay_variants upper', 'description')['bolt11'].upper()
+    l1.rpc.decodepay(b11)
+    l1.rpc.pay(b11)
+
+    # lightning: prefix is allowed
+    b11 = 'lightning:' + l2.rpc.invoice(123000, 'test_pay_variants with prefix', 'description')['bolt11']
+    l1.rpc.decodepay(b11)
+    l1.rpc.pay(b11)
+
+    # BOTH is allowed.
+    b11 = 'LIGHTNING:' + l2.rpc.invoice(123000, 'test_pay_variants upper with prefix', 'description')['bolt11'].upper()
+    l1.rpc.decodepay(b11)
+    l1.rpc.pay(b11)

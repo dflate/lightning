@@ -57,7 +57,7 @@
 /*~ This is common code: routines shared by one or more executables
  *  (separate daemons, or the lightning-cli program). */
 #include <common/daemon.h>
-#include <common/memleak.h>
+#include <common/json_escaped.h>
 #include <common/timeout.h>
 #include <common/utils.h>
 #include <common/version.h>
@@ -69,7 +69,6 @@
 #include <lightningd/channel_control.h>
 #include <lightningd/connect_control.h>
 #include <lightningd/invoice.h>
-#include <lightningd/json_escaped.h>
 #include <lightningd/jsonrpc.h>
 #include <lightningd/log.h>
 #include <lightningd/onchain_control.h>
@@ -111,20 +110,11 @@ static struct lightningd *new_lightningd(const tal_t *ctx)
 	 * is a nod to keeping it minimal and explicit: we need this code for
 	 * testing, but its existence means we're not actually testing the
 	 * same exact code users will be running. */
+	ld->dev_debug_subprocess = NULL;
 #if DEVELOPER
-	ld->dev_debug_subdaemon = NULL;
 	ld->dev_disconnect_fd = -1;
 	ld->dev_subdaemon_fail = false;
 	ld->dev_allow_localhost = false;
-
-	/*~ Behaving differently depending on environment variables is a hack,
-	 * *but* hacks are allowed for dev-mode stuff.  In this case, there's
-	 * a significant overhead to the memory leak detection stuff, and we
-	 * can't use it under valgrind (an awesome runtime memory usage
-	 * detector for C and C++ programs), so the test harness uses this var
-	 * to disable it in that case. */
-	if (getenv("LIGHTNINGD_DEV_MEMLEAK"))
-		memleak_init();
 #endif
 
 	/*~ These are CCAN lists: an embedded double-linked list.  It's not
@@ -211,6 +201,21 @@ static struct lightningd *new_lightningd(const tal_t *ctx)
 	ld->tor_service_password = NULL;
 	ld->max_funding_unconfirmed = 2016;
 
+	/*~ In the next step we will initialize the plugins. This will
+	 *  also populate the JSON-RPC with passthrough methods, hence
+	 *  lightningd needs to have something to put those in. This
+	 *  is that :-)
+	 */
+	ld->jsonrpc = jsonrpc_new(ld, ld);
+
+	/*~ We run a number of plugins (subprocesses that we talk JSON-RPC with)
+	 *alongside this process. This allows us to have an easy way for users
+	 *to add their own tools without having to modify the c-lightning source
+	 *code. Here we initialize the context that will keep track and control
+	 *the plugins.
+	 */
+	ld->plugins = plugins_new(ld, ld->log_book, ld->jsonrpc, ld);
+
 	return ld;
 }
 
@@ -253,10 +258,10 @@ void test_subdaemons(const struct lightningd *ld)
 		const char *dpath = path_join(tmpctx, ld->daemon_dir, subdaemons[i]);
 		const char *verstring;
 		/*~ CCAN's pipecmd module is like popen for grownups: it
-		 * takes pointers to fill in stdout, stdin and stderr file
+		 * takes pointers to fill in stdin, stdout and stderr file
 		 * descriptors if desired, and the remainder of arguments
 		 * are the command and its argument. */
-		pid_t pid = pipecmd(&outfd, NULL, &outfd,
+		pid_t pid = pipecmd(NULL, &outfd, &outfd,
 				    dpath, "--version", NULL);
 
 		/*~ Our logging system: spam goes in at log_debug level, but
@@ -334,7 +339,7 @@ static const char *find_my_directory(const tal_t *ctx, const char *argv0)
  *
  * TAKES is only a convention unfortunately, and ignored by the compiler.
  */
-static const char *find_my_pkglibexec_path(const tal_t *ctx,
+static const char *find_my_pkglibexec_path(struct lightningd *ld,
 					   const char *my_path TAKES)
 {
 	const char *pkglibexecdir;
@@ -347,28 +352,40 @@ static const char *find_my_pkglibexec_path(const tal_t *ctx,
 	 * So, as we promised with 'TAKES' in our own declaration, if the
 	 * caller has called `take()` the `my_path` parameter, path_join()
 	 * will free it. */
-	pkglibexecdir = path_join(ctx, my_path, BINTOPKGLIBEXECDIR);
+	pkglibexecdir = path_join(NULL, my_path, BINTOPKGLIBEXECDIR);
+
+	/*~ The plugin dir is in ../libexec/c-lightning/plugins, which (unlike
+	 * those given on the command line) does not need to exist. */
+	add_plugin_dir(ld->plugins,
+		       path_join(tmpctx, pkglibexecdir, "plugins"),
+		       true);
 
 	/*~ Sometimes take() can be more efficient, since the routine can
 	 * manipulate the string in place.  This is the case here. */
-	return path_simplify(ctx, take(pkglibexecdir));
+	return path_simplify(ld, take(pkglibexecdir));
 }
 
 /* Determine the correct daemon dir. */
-static const char *find_daemon_dir(const tal_t *ctx, const char *argv0)
+static const char *find_daemon_dir(struct lightningd *ld, const char *argv0)
 {
-	const char *my_path = find_my_directory(ctx, argv0);
+	const char *my_path = find_my_directory(ld, argv0);
 	/* If we're running in-tree, all the subdaemons are with lightningd. */
-	if (has_all_subdaemons(my_path))
+	if (has_all_subdaemons(my_path)) {
+		/* In this case, look in ../plugins */
+		add_plugin_dir(ld->plugins,
+			       path_join(tmpctx, my_path, "../plugins"),
+			       true);
 		return my_path;
+	}
 
 	/* Otherwise we assume they're in the installed dir. */
-	return find_my_pkglibexec_path(ctx, take(my_path));
+	return find_my_pkglibexec_path(ld, take(my_path));
 }
 
-/*~ We like to free everything on exit, so valgrind doesn't complain.  In some
- * ways it would be neater not to do this, but it turns out some transient
- * objects still need cleaning. */
+/*~ We like to free everything on exit, so valgrind doesn't complain (valgrind
+ * is an awesome runtime memory usage detector for C and C++ programs). In
+ * some ways it would be neater not to do this, but it turns out some
+ * transient objects still need cleaning. */
 static void shutdown_subdaemons(struct lightningd *ld)
 {
 	struct peer *p;
@@ -585,6 +602,17 @@ int main(int argc, char *argv[])
 	 *  mimic this API here, even though they're on separate lines.*/
 	register_opts(ld);
 
+	/*~ Handle early options, but don't move to --lightning-dir
+	 *  just yet. Plugins may add new options, which is why we are
+	 *  splitting between early args (including --plugin
+	 *  registration) and non-early opts. */
+	handle_early_opts(ld, argc, argv);
+
+	/*~ Initialize all the plugins we just registered, so they can
+	 *  do their thing and tell us about themselves (including
+	 *  options registration). */
+	plugins_init(ld->plugins, ld->dev_debug_subprocess);
+
 	/*~ Handle options and config; move to .lightningd (--lightning-dir) */
 	handle_opts(ld, argc, argv);
 
@@ -680,7 +708,11 @@ int main(int argc, char *argv[])
 
 	/*~ Create RPC socket: now lightning-cli can send us JSON RPC commands
 	 *  over a UNIX domain socket specified by `ld->rpc_filename`. */
-	setup_jsonrpc(ld, ld->rpc_filename);
+	jsonrpc_listen(ld->jsonrpc, ld);
+
+	/*~ Now that the rpc path exists, we can start the plugins and they
+	 * can start talking to us. */
+	plugins_config(ld->plugins);
 
 	/*~ We defer --daemon until we've completed most initialization: that
 	 *  way we'll exit with an error rather than silently exiting 0, then
@@ -759,11 +791,13 @@ int main(int argc, char *argv[])
 
 	shutdown_subdaemons(ld);
 
+	tal_free(ld->plugins);
+
 	/* Clean up the JSON-RPC. This needs to happen in a DB transaction since
 	 * it might actually be touching the DB in some destructors, e.g.,
 	 * unreserving UTXOs (see #1737) */
 	db_begin_transaction(ld->wallet->db);
-	tal_free(ld->rpc_listener);
+	tal_free(ld->jsonrpc);
 	db_commit_transaction(ld->wallet->db);
 
 	remove(ld->pidfile);
@@ -774,9 +808,6 @@ int main(int argc, char *argv[])
 	tal_free(ld);
 	opt_free_table();
 
-#if DEVELOPER
-	memleak_cleanup();
-#endif
 	daemon_shutdown();
 
 	/*~ Farewell.  Next stop: hsmd/hsmd.c. */

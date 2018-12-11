@@ -1,3 +1,11 @@
+from bitcoin.rpc import RawProxy as BitcoinProxy
+from btcproxy import BitcoinRpcProxy
+from collections import OrderedDict
+from decimal import Decimal
+from ephemeral_port_reserve import reserve
+from lightning import LightningRpc
+
+import json
 import logging
 import os
 import random
@@ -9,12 +17,6 @@ import subprocess
 import threading
 import time
 
-from btcproxy import BitcoinRpcProxy
-from bitcoin.rpc import RawProxy as BitcoinProxy
-from decimal import Decimal
-from ephemeral_port_reserve import reserve
-from lightning import LightningRpc
-
 BITCOIND_CONFIG = {
     "regtest": 1,
     "rpcuser": "rpcuser",
@@ -22,21 +24,23 @@ BITCOIND_CONFIG = {
 }
 
 
-LIGHTNINGD_CONFIG = {
+LIGHTNINGD_CONFIG = OrderedDict({
     "log-level": "debug",
     "cltv-delta": 6,
     "cltv-final": 5,
     "watchtime-blocks": 5,
     "rescan": 1,
     'disable-dns': None,
-}
+})
 
 with open('config.vars') as configfile:
     config = dict([(line.rstrip().split('=', 1)) for line in configfile])
 
 DEVELOPER = os.getenv("DEVELOPER", config['DEVELOPER']) == "1"
+EXPERIMENTAL_FEATURES = os.getenv("EXPERIMENTAL_FEATURES", config['EXPERIMENTAL_FEATURES']) == "1"
 TIMEOUT = int(os.getenv("TIMEOUT", "120"))
 VALGRIND = os.getenv("VALGRIND", config['VALGRIND']) == "1"
+SLOW_MACHINE = os.getenv("SLOW_MACHINE", "0") == "1"
 
 
 def wait_for(success, timeout=TIMEOUT):
@@ -291,12 +295,13 @@ class BitcoinD(TailableProc):
 
     def generate_block(self, numblocks=1):
         # As of 0.16, generate() is removed; use generatetoaddress.
-        self.rpc.generatetoaddress(numblocks, self.rpc.getnewaddress())
+        return self.rpc.generatetoaddress(numblocks, self.rpc.getnewaddress())
 
 
 class LightningD(TailableProc):
     def __init__(self, lightning_dir, bitcoind, port=9735, random_hsm=False, node_id=0):
         TailableProc.__init__(self, lightning_dir)
+        self.executable = 'lightningd/lightningd'
         self.lightning_dir = lightning_dir
         self.port = port
         self.cmd_prefix = []
@@ -341,7 +346,7 @@ class LightningD(TailableProc):
     def cmd_line(self):
 
         opts = []
-        for k, v in sorted(self.opts.items()):
+        for k, v in self.opts.items():
             if v is None:
                 opts.append("--{}".format(k))
             elif isinstance(v, list):
@@ -350,7 +355,7 @@ class LightningD(TailableProc):
             else:
                 opts.append("--{}={}".format(k, v))
 
-        return self.cmd_prefix + ['lightningd/lightningd'] + opts
+        return self.cmd_prefix + [self.executable] + opts
 
     def start(self):
         self.rpcproxy.start()
@@ -380,7 +385,7 @@ class LightningNode(object):
         self.may_fail = may_fail
         self.may_reconnect = may_reconnect
 
-    def openchannel(self, remote_node, capacity, addrtype="p2sh-segwit", confirm=True, announce=True, connect=True):
+    def openchannel(self, remote_node, capacity, addrtype="p2sh-segwit", confirm=True, wait_for_announce=True, connect=True):
         addr, wallettxid = self.fundwallet(10 * capacity, addrtype)
 
         if connect and remote_node.info['id'] not in [p['id'] for p in self.rpc.listpeers()['peers']]:
@@ -391,13 +396,13 @@ class LightningNode(object):
         # Wait for the funding transaction to be in bitcoind's mempool
         wait_for(lambda: fundingtx['txid'] in self.bitcoin.rpc.getrawmempool())
 
-        if confirm or announce:
+        if confirm or wait_for_announce:
             self.bitcoin.generate_block(1)
 
-        if announce:
+        if wait_for_announce:
             self.bitcoin.generate_block(6)
 
-        if confirm or announce:
+        if confirm or wait_for_announce:
             self.daemon.wait_for_log(
                 r'Funding tx {} depth'.format(fundingtx['txid']))
         return {'address': addr, 'wallettxid': wallettxid, 'fundingtx': fundingtx}
@@ -491,7 +496,7 @@ class LightningNode(object):
 
         self.start()
 
-    def fund_channel(self, l2, amount):
+    def fund_channel(self, l2, amount, wait_for_active=True):
 
         # Give yourself some funds to work with
         addr = self.rpc.newaddr()['address']
@@ -522,18 +527,19 @@ class LightningNode(object):
             decoded2 = self.bitcoin.rpc.decoderawtransaction(tx)
             raise ValueError("Can't find {} payment in {} (1={} 2={})".format(amount, tx, decoded, decoded2))
 
-        # We wait until gossipd sees both local updates, as well as status NORMAL,
-        # so it can definitely route through.
-        self.daemon.wait_for_logs([r'update for channel {}\(0\) now ACTIVE'
-                                   .format(scid),
-                                   r'update for channel {}\(1\) now ACTIVE'
-                                   .format(scid),
-                                   'to CHANNELD_NORMAL'])
-        l2.daemon.wait_for_logs([r'update for channel {}\(0\) now ACTIVE'
-                                 .format(scid),
-                                 r'update for channel {}\(1\) now ACTIVE'
-                                 .format(scid),
-                                 'to CHANNELD_NORMAL'])
+        if wait_for_active:
+            # We wait until gossipd sees both local updates, as well as status NORMAL,
+            # so it can definitely route through.
+            self.daemon.wait_for_logs([r'update for channel {}\(0\) now ACTIVE'
+                                       .format(scid),
+                                       r'update for channel {}\(1\) now ACTIVE'
+                                       .format(scid),
+                                       'to CHANNELD_NORMAL'])
+            l2.daemon.wait_for_logs([r'update for channel {}\(0\) now ACTIVE'
+                                     .format(scid),
+                                     r'update for channel {}\(1\) now ACTIVE'
+                                     .format(scid),
+                                     'to CHANNELD_NORMAL'])
         return scid
 
     def subd_pid(self, subd):
@@ -585,9 +591,9 @@ class LightningNode(object):
     def wait_for_routes(self, channel_ids):
         # Could happen in any order...
         self.daemon.wait_for_logs(['Received channel_update for channel {}\\(0\\)'.format(c)
-                                   for c in channel_ids] +
-                                  ['Received channel_update for channel {}\\(1\\)'.format(c)
-                                   for c in channel_ids])
+                                   for c in channel_ids]
+                                  + ['Received channel_update for channel {}\\(1\\)'.format(c)
+                                     for c in channel_ids])
 
     def pay(self, dst, amt, label=None):
         if not label:
@@ -769,7 +775,7 @@ class NodeFactory(object):
                 'valgrind',
                 '-q',
                 '--trace-children=yes',
-                '--trace-children-skip=*groestlcoin-cli*',
+                '--trace-children-skip=*plugins*,*python*,*groestlcoin-cli*',
                 '--error-exitcode=7',
                 '--log-file={}/valgrind-errors.%p'.format(node.daemon.lightning_dir)
             ]
@@ -782,9 +788,10 @@ class NodeFactory(object):
                 raise
         return node
 
-    def line_graph(self, num_nodes, fundchannel=True, fundamount=10**6, announce=False, opts=None):
+    def line_graph(self, num_nodes, fundchannel=True, fundamount=10**6, wait_for_announce=False, opts=None, announce_channels=True):
         """ Create nodes, connect them and optionally fund channels.
         """
+        assert not (wait_for_announce and not announce_channels), "You've asked to wait for an announcement that's not coming. (wait_for_announce=True,announce_channels=False)"
         nodes = self.get_nodes(num_nodes, opts=opts)
         bitcoin = nodes[0].bitcoin
         connections = [(nodes[i], nodes[i + 1]) for i in range(0, num_nodes - 1)]
@@ -807,7 +814,7 @@ class NodeFactory(object):
         bitcoin.generate_block(1)
         for src, dst in connections:
             wait_for(lambda: len(src.rpc.listfunds()['outputs']) > 0)
-            tx = src.rpc.fundchannel(dst.info['id'], fundamount)
+            tx = src.rpc.fundchannel(dst.info['id'], fundamount, announce=announce_channels)
             wait_for(lambda: tx['txid'] in bitcoin.rpc.getrawmempool())
 
         # Confirm all channels and wait for them to become usable
@@ -821,7 +828,7 @@ class NodeFactory(object):
 
         bitcoin.generate_block(1)
 
-        if not announce:
+        if not wait_for_announce:
             return nodes
 
         bitcoin.generate_block(5)
@@ -863,7 +870,9 @@ class NodeFactory(object):
                     unexpected_fail = True
 
             if leaks is not None and len(leaks) != 0:
-                raise Exception("Node {} has memory leaks: {}"
-                                .format(self.nodes[i].daemon.lightning_dir, leaks))
+                raise Exception("Node {} has memory leaks: {}".format(
+                    self.nodes[i].daemon.lightning_dir,
+                    json.dumps(leaks, sort_keys=True, indent=4)
+                ))
 
         return not unexpected_fail

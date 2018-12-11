@@ -514,7 +514,7 @@ static struct peer *wallet_peer_load(struct wallet *w, const u64 dbid)
 	const unsigned char *addrstr;
 	struct peer *peer;
 	struct pubkey id;
-	struct wireaddr_internal *addrp, addr;
+	struct wireaddr_internal addr;
 
 	sqlite3_stmt *stmt =
 		db_query(w->db,
@@ -529,17 +529,13 @@ static struct peer *wallet_peer_load(struct wallet *w, const u64 dbid)
 		return NULL;
 	}
 	addrstr = sqlite3_column_text(stmt, 2);
-	if (addrstr) {
-		addrp = &addr;
-		if (!parse_wireaddr_internal((const char*)addrstr, addrp, DEFAULT_PORT, false, false, true, NULL)) {
-			db_stmt_done(stmt);
-			return NULL;
-		}
-	} else
-		addrp = NULL;
+	if (!parse_wireaddr_internal((const char*)addrstr, &addr, DEFAULT_PORT, false, false, true, NULL)) {
+		db_stmt_done(stmt);
+		return NULL;
+	}
 
 	peer = new_peer(w->ld, sqlite3_column_int64(stmt, 0),
-			&id, addrp, NULL, NULL);
+			&id, &addr);
 	db_stmt_done(stmt);
 
 	return peer;
@@ -575,7 +571,7 @@ static struct channel *wallet_stmt2channel(const tal_t *ctx, struct wallet *w, s
 	struct wallet_shachain wshachain;
 	struct channel_config our_config;
 	struct bitcoin_txid funding_txid;
-	secp256k1_ecdsa_signature last_sig;
+	struct bitcoin_signature last_sig;
 	u8 *remote_shutdown_scriptpubkey;
 	struct changed_htlc *last_sent_commit;
 	s64 final_key_idx;
@@ -637,7 +633,8 @@ static struct channel *wallet_stmt2channel(const tal_t *ctx, struct wallet *w, s
 					 &our_config);
 	ok &= sqlite3_column_sha256_double(stmt, 12, &funding_txid.shad);
 
-	ok &= sqlite3_column_signature(stmt, 33, &last_sig);
+	ok &= sqlite3_column_signature(stmt, 33, &last_sig.s);
+	last_sig.sighash_type = SIGHASH_ALL;
 
 	/* Populate channel_info */
 	ok &= sqlite3_column_pubkey(stmt, 18, &channel_info.remote_fundingkey);
@@ -973,7 +970,7 @@ void wallet_channel_save(struct wallet *w, struct channel *chan)
 	sqlite3_bind_int64(stmt, 17, chan->final_key_idx);
 	sqlite3_bind_int64(stmt, 18, chan->our_config.id);
 	sqlite3_bind_tx(stmt, 19, chan->last_tx);
-	sqlite3_bind_signature(stmt, 20, &chan->last_sig);
+	sqlite3_bind_signature(stmt, 20, &chan->last_sig.s);
 	sqlite3_bind_int(stmt, 21, chan->last_was_revoke);
 	sqlite3_bind_int(stmt, 22, chan->min_possible_feerate);
 	sqlite3_bind_int(stmt, 23, chan->max_possible_feerate);
@@ -1041,13 +1038,9 @@ void wallet_channel_insert(struct wallet *w, struct channel *chan)
 		/* Need to create the peer first */
 		stmt = db_prepare(w->db, "INSERT INTO peers (node_id, address) VALUES (?, ?);");
 		sqlite3_bind_pubkey(stmt, 1, &chan->peer->id);
-		if (chan->peer->addr.itype == ADDR_INTERNAL_WIREADDR
-		    && chan->peer->addr.u.wireaddr.type == ADDR_TYPE_PADDING)
-			sqlite3_bind_null(stmt, 2);
-		else
-			sqlite3_bind_text(stmt, 2,
-					  type_to_string(tmpctx, struct wireaddr_internal, &chan->peer->addr),
-					  -1, SQLITE_TRANSIENT);
+		sqlite3_bind_text(stmt, 2,
+				  type_to_string(tmpctx, struct wireaddr_internal, &chan->peer->addr),
+				  -1, SQLITE_TRANSIENT);
 		db_exec_prepared(w->db, stmt);
 		chan->peer->dbid = sqlite3_last_insert_rowid(w->db->sql);
 	}
@@ -2014,8 +2007,9 @@ bool wallet_network_check(struct wallet *w,
 			log_broken(w->log, "Wallet blockchain hash does not "
 					   "match network blockchain hash: %s "
 					   "!= %s. "
-				           "Are you on the right network? "
-				           "(--network={bitcoin,testnet})",
+					   "Are you on the right network? "
+					   "(--network={bitcoin, testnet, regtest, "
+					   "litecoin or litecoin-testnet})",
 				   type_to_string(w, struct bitcoin_blkid,
 						  &chainhash),
 				   type_to_string(w, struct bitcoin_blkid,

@@ -4,7 +4,10 @@
 #include <ccan/tal/str/str.h>
 #include <common/channel_config.h>
 #include <common/funding_tx.h>
+#include <common/json_command.h>
+#include <common/jsonrpc_errors.h>
 #include <common/key_derive.h>
+#include <common/param.h>
 #include <common/wallet_tx.h>
 #include <common/wire_error.h>
 #include <connectd/gen_connect_wire.h>
@@ -16,11 +19,9 @@
 #include <lightningd/hsm_control.h>
 #include <lightningd/json.h>
 #include <lightningd/jsonrpc.h>
-#include <lightningd/jsonrpc_errors.h>
 #include <lightningd/lightningd.h>
 #include <lightningd/log.h>
 #include <lightningd/opening_control.h>
-#include <lightningd/param.h>
 #include <lightningd/peer_control.h>
 #include <lightningd/subd.h>
 #include <openingd/gen_opening_wire.h>
@@ -133,7 +134,7 @@ static struct channel *
 wallet_commit_channel(struct lightningd *ld,
 		      struct uncommitted_channel *uc,
 		      struct bitcoin_tx *remote_commit,
-		      secp256k1_ecdsa_signature *remote_commit_sig,
+		      struct bitcoin_signature *remote_commit_sig,
 		      const struct bitcoin_txid *funding_txid,
 		      u16 funding_outnum,
 		      u64 funding_satoshi,
@@ -230,7 +231,7 @@ static void opening_funder_finished(struct subd *openingd, const u8 *resp,
 	struct bitcoin_txid funding_txid, expected_txid;
 	struct pubkey changekey;
 	struct crypto_state cs;
-	secp256k1_ecdsa_signature remote_commit_sig;
+	struct bitcoin_signature remote_commit_sig;
 	struct bitcoin_tx *remote_commit;
 	u16 funding_outnum;
 	u32 feerate;
@@ -412,7 +413,7 @@ static void opening_fundee_finished(struct subd *openingd,
 	u8 *funding_signed;
 	struct channel_info channel_info;
 	struct crypto_state cs;
-	secp256k1_ecdsa_signature remote_commit_sig;
+	struct bitcoin_signature remote_commit_sig;
 	struct bitcoin_tx *remote_commit;
 	struct lightningd *ld = openingd->ld;
 	struct bitcoin_txid funding_txid;
@@ -675,6 +676,9 @@ static unsigned int openingd_msg(struct subd *openingd,
 	case WIRE_OPENING_INIT:
 	case WIRE_OPENING_FUNDER:
 	case WIRE_OPENING_CAN_ACCEPT_CHANNEL:
+	case WIRE_OPENING_DEV_MEMLEAK:
+	/* Replies never get here */
+	case WIRE_OPENING_DEV_MEMLEAK_REPLY:
 		break;
 	}
 	log_broken(openingd->log, "Unexpected msg %s: %s",
@@ -759,7 +763,9 @@ void opening_peer_no_active_channels(struct peer *peer)
  * json_fund_channel - Entrypoint for funding a channel
  */
 static void json_fund_channel(struct command *cmd,
-			      const char *buffer, const jsmntok_t *params)
+			      const char *buffer,
+			      const jsmntok_t *obj UNNEEDED,
+			      const jsmntok_t *params)
 {
 	const jsmntok_t *sattok;
 	struct funding_channel * fc = tal(cmd, struct funding_channel);
@@ -767,6 +773,7 @@ static void json_fund_channel(struct command *cmd,
 	struct peer *peer;
 	struct channel *channel;
 	u32 *feerate_per_kw;
+	bool *announce_channel;
 	u8 *msg;
 	u64 max_funding_satoshi = get_chainparams(cmd->ld)->max_funding_satoshi;
 
@@ -777,6 +784,7 @@ static void json_fund_channel(struct command *cmd,
 		   p_req("id", json_tok_pubkey, &id),
 		   p_req("gro", json_tok_tok, &sattok),
 		   p_opt("feerate", json_tok_feerate, &feerate_per_kw),
+		   p_opt_def("announce", json_tok_bool, &announce_channel, true),
 		   NULL))
 		return;
 
@@ -823,6 +831,11 @@ static void json_fund_channel(struct command *cmd,
 	/* FIXME: Support push_msat? */
 	fc->push_msat = 0;
 	fc->channel_flags = OUR_CHANNEL_FLAGS;
+	if (!*announce_channel) {
+		fc->channel_flags &= ~CHANNEL_FLAGS_ANNOUNCE_CHANNEL;
+		log_info(peer->ld->log, "Will open private channel with node %s",
+			type_to_string(fc, struct pubkey, id));
+	}
 
 	if (!wtx_select_utxos(&fc->wtx, *feerate_per_kw,
 			      BITCOIN_SCRIPTPUBKEY_P2WSH_LEN))
@@ -855,3 +868,68 @@ static const struct json_command fund_channel_command = {
 	"Fund channel with {id} using {gro} (or 'all') gro's, at optional {feerate}"
 };
 AUTODATA(json_command, &fund_channel_command);
+
+#if DEVELOPER
+ /* Indented to avoid include ordering check */
+ #include <lightningd/memdump.h>
+
+static void opening_died_forget_memleak(struct subd *openingd,
+					struct command *cmd)
+{
+	/* FIXME: We ignore the remaining openingds in this case. */
+	opening_memleak_done(cmd, NULL);
+}
+
+/* Mutual recursion */
+static void opening_memleak_req_next(struct command *cmd, struct peer *prev);
+static void opening_memleak_req_done(struct subd *openingd,
+				     const u8 *msg, const int *fds UNUSED,
+				     struct command *cmd)
+{
+	bool found_leak;
+	struct uncommitted_channel *uc = openingd->channel;
+
+	tal_del_destructor2(openingd, opening_died_forget_memleak, cmd);
+	if (!fromwire_opening_dev_memleak_reply(msg, &found_leak)) {
+		command_fail(cmd, LIGHTNINGD, "Bad opening_dev_memleak");
+		return;
+	}
+
+	if (found_leak) {
+		opening_memleak_done(cmd, openingd);
+		return;
+	}
+	opening_memleak_req_next(cmd, uc->peer);
+}
+
+static void opening_memleak_req_next(struct command *cmd, struct peer *prev)
+{
+	struct peer *p;
+
+	list_for_each(&cmd->ld->peers, p, list) {
+		if (!p->uncommitted_channel)
+			continue;
+		if (p == prev) {
+			prev = NULL;
+			continue;
+		}
+		if (prev != NULL)
+			continue;
+
+		subd_req(p,
+			 p->uncommitted_channel->openingd,
+			 take(towire_opening_dev_memleak(NULL)),
+			 -1, 0, opening_memleak_req_done, cmd);
+		/* Just in case it dies before replying! */
+		tal_add_destructor2(p->uncommitted_channel->openingd,
+				    opening_died_forget_memleak, cmd);
+		return;
+	}
+	opening_memleak_done(cmd, NULL);
+}
+
+void opening_dev_memleak(struct command *cmd)
+{
+	opening_memleak_req_next(cmd, NULL);
+}
+#endif /* DEVELOPER */

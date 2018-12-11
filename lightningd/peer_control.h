@@ -57,9 +57,7 @@ struct peer *find_peer_by_dbid(struct lightningd *ld, u64 dbid);
 
 struct peer *new_peer(struct lightningd *ld, u64 dbid,
 		      const struct pubkey *id,
-		      const struct wireaddr_internal *addr,
-		      const u8 *globalfeatures TAKES,
-		      const u8 *localfeatures TAKES);
+		      const struct wireaddr_internal *addr);
 
 /* Last one out deletes peer.  Also removes from db. */
 void maybe_delete_peer(struct peer *peer);
@@ -93,4 +91,9 @@ void channel_watch_funding(struct lightningd *ld, struct channel *channel);
 
 /* Pull peers, channels and HTLCs from db, and wire them up. */
 void load_channels_from_wallet(struct lightningd *ld);
+
+#if DEVELOPER
+void peer_dev_memleak(struct command *cmd);
+#endif /* DEVELOPER */
+
 #endif /* LIGHTNING_LIGHTNINGD_PEER_CONTROL_H */

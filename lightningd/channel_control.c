@@ -232,9 +232,11 @@ static unsigned channel_msg(struct subd *sd, const u8 *msg, const int *fds)
 	case WIRE_CHANNEL_SEND_SHUTDOWN:
 	case WIRE_CHANNEL_DEV_REENABLE_COMMIT:
 	case WIRE_CHANNEL_FEERATES:
+	case WIRE_CHANNEL_DEV_MEMLEAK:
 	/* Replies go to requests. */
 	case WIRE_CHANNEL_OFFER_HTLC_REPLY:
 	case WIRE_CHANNEL_DEV_REENABLE_COMMIT_REPLY:
+	case WIRE_CHANNEL_DEV_MEMLEAK_REPLY:
 		break;
 	}
 
@@ -379,7 +381,8 @@ void peer_start_channeld(struct channel *channel,
 				      channel->channel_flags,
 				      funding_signed,
 				      reached_announce_depth,
-				      &last_remote_per_commit_secret);
+				      &last_remote_per_commit_secret,
+				      channel->peer->localfeatures);
 
 	/* We don't expect a response: we are triggered by funding_depth_cb. */
 	subd_send_msg(channel->owner, take(initmsg));

@@ -34,8 +34,11 @@ LIGHTNINGD_COMMON_OBJS :=			\
 	common/key_derive.o			\
 	common/io_lock.o			\
 	common/json.o				\
+	common/json_escaped.o			\
+	common/json_tok.o			\
 	common/memleak.o			\
 	common/msg_queue.o			\
+	common/param.o				\
 	common/permute_tx.o			\
 	common/pseudorand.o			\
 	common/sphinx.o				\
@@ -64,28 +67,25 @@ LIGHTNINGD_SRC :=				\
 	lightningd/htlc_end.c			\
 	lightningd/invoice.c			\
 	lightningd/json.c			\
-	lightningd/json_escaped.c		\
+	lightningd/json_stream.c		\
 	lightningd/jsonrpc.c			\
 	lightningd/lightningd.c			\
 	lightningd/log.c			\
 	lightningd/log_status.c			\
+	lightningd/memdump.c			\
 	lightningd/onchain_control.c		\
 	lightningd/opening_control.c		\
 	lightningd/options.c			\
-	lightningd/param.c			\
 	lightningd/pay.c			\
 	lightningd/payalgo.c			\
 	lightningd/peer_control.c		\
 	lightningd/peer_htlcs.c			\
 	lightningd/ping.c			\
+	lightningd/plugin.c			\
 	lightningd/subd.c			\
 	lightningd/watch.c
 
-# Source files without corresponding headers
-LIGHTNINGD_SRC_NOHDR :=				\
-	lightningd/memdump.c
-
-LIGHTNINGD_OBJS := $(LIGHTNINGD_SRC:.c=.o) $(LIGHTNINGD_SRC_NOHDR:.c=.o)
+LIGHTNINGD_OBJS := $(LIGHTNINGD_SRC:.c=.o)
 
 # Make sure these depend on everything.
 ALL_OBJS += $(LIGHTNINGD_OBJS)
@@ -93,8 +93,7 @@ ALL_OBJS += $(LIGHTNINGD_OBJS)
 # We accumulate all lightningd/ headers in these three:
 LIGHTNINGD_HEADERS_NOGEN =			\
 	$(LIGHTNINGD_SRC:.c=.h)			\
-	lightningd/channel_state.h			\
-	lightningd/jsonrpc_errors.h
+	lightningd/channel_state.h
 
 # Generated headers
 LIGHTNINGD_HEADERS_GEN =			\

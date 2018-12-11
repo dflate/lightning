@@ -55,7 +55,7 @@ def test_names(node_factory):
 
     for key, alias, color in configs:
         n = node_factory.get_node()
-        assert n.daemon.is_in_log('public key {}, alias {}.* \(color #{}\)'
+        assert n.daemon.is_in_log(r'public key {}, alias {}.* \(color #{}\)'
                                   .format(key, alias, color))
 
 
@@ -145,7 +145,7 @@ def test_ping(node_factory):
     # Test gossip pinging.
     ping_tests(l1, l2)
     if DEVELOPER:
-        l1.daemon.wait_for_log('Got pong 1000 bytes \({}\.\.\.\)'
+        l1.daemon.wait_for_log(r'Got pong 1000 bytes \({}\.\.\.\)'
                                .format(l2.info['version']), timeout=1)
 
     l1.fund_channel(l2, 10**5)
@@ -153,12 +153,12 @@ def test_ping(node_factory):
     # channeld pinging
     ping_tests(l1, l2)
     if DEVELOPER:
-        l1.daemon.wait_for_log('Got pong 1000 bytes \({}\.\.\.\)'
+        l1.daemon.wait_for_log(r'Got pong 1000 bytes \({}\.\.\.\)'
                                .format(l2.info['version']))
 
 
 @unittest.skipIf(not DEVELOPER, "needs DEVELOPER=1 for --dev-broadcast-interval")
-def test_htlc_sig_persistence(node_factory, executor):
+def test_htlc_sig_persistence(node_factory, bitcoind, executor):
     """Interrupt a payment between two peers, then fail and recover funds using the HTLC sig.
     """
     # Feerates identical so we don't get gratuitous commit to update them
@@ -184,7 +184,7 @@ def test_htlc_sig_persistence(node_factory, executor):
     # Make sure it broadcasts to chain.
     l2.wait_for_channel_onchain(l1.info['id'])
     l2.stop()
-    l1.bitcoin.rpc.generate(1)
+    bitcoind.generate_block(1)
     l1.start()
 
     assert l1.daemon.is_in_log(r'Loaded 1 HTLC signatures from DB')
@@ -192,10 +192,10 @@ def test_htlc_sig_persistence(node_factory, executor):
         r'Peer permanent failure in CHANNELD_NORMAL: Funding transaction spent',
         r'Propose handling THEIR_UNILATERAL/OUR_HTLC by OUR_HTLC_TIMEOUT_TO_US'
     ])
-    l1.bitcoin.rpc.generate(5)
+    bitcoind.generate_block(5)
     l1.daemon.wait_for_log("Broadcasting OUR_HTLC_TIMEOUT_TO_US")
     time.sleep(3)
-    l1.bitcoin.rpc.generate(1)
+    bitcoind.generate_block(1)
     l1.daemon.wait_for_logs([
         r'Owning output . (\d+) .SEGWIT. txid',
     ])
@@ -388,7 +388,7 @@ def test_withdraw(node_factory, bitcoind):
     # lightningd uses P2SH-P2WPKH
     waddr = l2.rpc.newaddr('bech32')['address']
     l1.rpc.withdraw(waddr, 2 * amount)
-    l1.bitcoin.rpc.generate(1)
+    bitcoind.generate_block(1)
 
     # Make sure l2 received the withdrawal.
     wait_for(lambda: len(l2.rpc.listfunds()['outputs']) == 1)
@@ -408,7 +408,7 @@ def test_withdraw(node_factory, bitcoind):
     with pytest.raises(RpcError):
         l1.rpc.withdraw('tgrs1qccn808860ygrqq98e6ltplxu8hvjk08nxxxxxx', 2 * amount)
     l1.rpc.withdraw(waddr, 2 * amount)
-    l1.bitcoin.rpc.generate(1)
+    bitcoind.generate_block(1)
     # Now make sure additional two of them were marked as spent
     assert l1.db_query('SELECT COUNT(*) as c FROM outputs WHERE status=2')[0]['c'] == 6
 
@@ -422,7 +422,7 @@ def test_withdraw(node_factory, bitcoind):
     with pytest.raises(RpcError):
         l1.rpc.withdraw('tgrs1qpc4mnd3zfzjnyyyxj97yxcastjh7cx7m3ex6pn33quse9qleqsjsxxxxxx', 2 * amount)
     l1.rpc.withdraw(waddr, 2 * amount)
-    l1.bitcoin.rpc.generate(1)
+    bitcoind.generate_block(1)
     # Now make sure additional two of them were marked as spent
     assert l1.db_query('SELECT COUNT(*) as c FROM outputs WHERE status=2')[0]['c'] == 8
 
@@ -457,7 +457,7 @@ def test_withdraw(node_factory, bitcoind):
 
     # Test withdrawal to self.
     l1.rpc.withdraw(l1.rpc.newaddr('bech32')['address'], 'all')
-    bitcoind.rpc.generate(1)
+    bitcoind.generate_block(1)
     assert l1.db_query('SELECT COUNT(*) as c FROM outputs WHERE status=0')[0]['c'] == 1
 
     l1.rpc.withdraw(waddr, 'all')
@@ -476,7 +476,7 @@ def test_addfunds_from_block(node_factory, bitcoind):
 
     addr = l1.rpc.newaddr()['address']
     bitcoind.rpc.sendtoaddress(addr, 0.1)
-    bitcoind.rpc.generate(1)
+    bitcoind.generate_block(1)
 
     wait_for(lambda: len(l1.rpc.listfunds()['outputs']) == 1)
 
@@ -490,7 +490,7 @@ def test_addfunds_from_block(node_factory, bitcoind):
     # Send all our money to a P2WPKH address this time.
     addr = l1.rpc.newaddr("bech32")['address']
     l1.rpc.withdraw(addr, "all")
-    bitcoind.rpc.generate(1)
+    bitcoind.generate_block(1)
     time.sleep(1)
 
     # The address we detect must match what was paid to.
@@ -611,7 +611,81 @@ def test_multirpc(node_factory):
 
     sock.sendall(b'\n'.join(commands))
 
-    l1.rpc._readobj(sock)
+    buff = b''
+    for i in commands:
+        _, buff = l1.rpc._readobj(sock, buff)
+    sock.close()
+
+
+@unittest.skipIf(not DEVELOPER, "needs DEVELOPER=1")
+def test_multiplexed_rpc(node_factory):
+    """Test that we can do multiple RPCs which exit in different orders"""
+    l1 = node_factory.get_node()
+
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.connect(l1.rpc.socket_path)
+
+    # Neighbouring ones may be in or out of order.
+    commands = [
+        b'{"id":1,"jsonrpc":"2.0","method":"dev-slowcmd","params":[2000]}',
+        b'{"id":1,"jsonrpc":"2.0","method":"dev-slowcmd","params":[2000]}',
+        b'{"id":2,"jsonrpc":"2.0","method":"dev-slowcmd","params":[1500]}',
+        b'{"id":2,"jsonrpc":"2.0","method":"dev-slowcmd","params":[1500]}',
+        b'{"id":3,"jsonrpc":"2.0","method":"dev-slowcmd","params":[1000]}',
+        b'{"id":3,"jsonrpc":"2.0","method":"dev-slowcmd","params":[1000]}',
+        b'{"id":4,"jsonrpc":"2.0","method":"dev-slowcmd","params":[500]}',
+        b'{"id":4,"jsonrpc":"2.0","method":"dev-slowcmd","params":[500]}'
+    ]
+
+    sock.sendall(b'\n'.join(commands))
+
+    buff = b''
+
+    # They will return in the same order, since they start immediately
+    # (delaying completion should mean we don't see the other commands intermingled).
+    for i in commands:
+        obj, buff = l1.rpc._readobj(sock, buff)
+        assert obj['id'] == l1.rpc.decoder.decode(i.decode("UTF-8"))['id']
+    sock.close()
+
+
+def test_malformed_rpc(node_factory):
+    """Test that we get a correct response to malformed RPC commands"""
+    l1 = node_factory.get_node()
+
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.connect(l1.rpc.socket_path)
+
+    # No ID
+    sock.sendall(b'{"jsonrpc":"2.0","method":"getinfo","params":[]}')
+    obj, _ = l1.rpc._readobj(sock, b'')
+    assert obj['error']['code'] == -32600
+
+    # No method
+    sock.sendall(b'{"id":1, "jsonrpc":"2.0","params":[]}')
+    obj, _ = l1.rpc._readobj(sock, b'')
+    assert obj['error']['code'] == -32600
+
+    # Complete crap
+    sock.sendall(b'[]')
+    obj, _ = l1.rpc._readobj(sock, b'')
+    assert obj['error']['code'] == -32600
+
+    # Bad ID
+    sock.sendall(b'{"id":{}, "jsonrpc":"2.0","method":"getinfo","params":[]}')
+    obj, _ = l1.rpc._readobj(sock, b'')
+    assert obj['error']['code'] == -32600
+
+    # Bad method
+    sock.sendall(b'{"id":1, "method": 12, "jsonrpc":"2.0","params":[]}')
+    obj, _ = l1.rpc._readobj(sock, b'')
+    assert obj['error']['code'] == -32600
+
+    # Unknown method
+    sock.sendall(b'{"id":1, "method": "unknown", "jsonrpc":"2.0","params":[]}')
+    obj, _ = l1.rpc._readobj(sock, b'')
+    assert obj['error']['code'] == -32601
+
     sock.close()
 
 
@@ -700,10 +774,10 @@ def test_blockchaintrack(node_factory, bitcoind):
     height = bitcoind.rpc.getblockcount()
 
     # At height 111 we receive an incoming payment
-    hashes = bitcoind.rpc.generate(9)
+    hashes = bitcoind.generate_block(9)
     bitcoind.rpc.sendtoaddress(addr, 1)
     time.sleep(1)  # mempool is still unpredictable
-    bitcoind.rpc.generate(1)
+    bitcoind.generate_block(1)
 
     l1.daemon.wait_for_log(r'Owning')
     outputs = l1.rpc.listfunds()['outputs']
@@ -711,14 +785,14 @@ def test_blockchaintrack(node_factory, bitcoind):
 
     ######################################################################
     # Second failure scenario: perform a 20 block reorg
-    bitcoind.rpc.generate(10)
+    bitcoind.generate_block(10)
     l1.daemon.wait_for_log('Adding block {}: '.format(height + 20))
 
     # Now reorg out with a longer fork of 21 blocks
     bitcoind.rpc.invalidateblock(hashes[0])
     bitcoind.wait_for_log(r'InvalidChainFound: invalid block=.*  height={}'
                           .format(height + 1))
-    hashes = bitcoind.rpc.generate(30)
+    hashes = bitcoind.generate_block(30)
     time.sleep(1)
 
     bitcoind.rpc.getblockcount()
@@ -756,12 +830,13 @@ def test_rescan(node_factory, bitcoind):
     # the current height
     l1.daemon.opts['rescan'] = -500000
     l1.stop()
-    bitcoind.rpc.generate(4)
+    bitcoind.generate_block(4)
     l1.start()
     l1.daemon.wait_for_log(r'Adding block 125')
     assert not l1.daemon.is_in_log(r'Adding block 122')
 
 
+@flaky
 def test_reserve_enforcement(node_factory, executor):
     """Channeld should disallow you spending into your reserve"""
     l1, l2 = node_factory.line_graph(2, opts={'may_reconnect': True})
@@ -819,7 +894,7 @@ def test_htlc_send_timeout(node_factory, bitcoind):
     timedout = False
     while not timedout:
         try:
-            l2.daemon.wait_for_log('channeld-{} chan #[0-9]*:\[IN\] 0101'.format(l3.info['id']), timeout=30)
+            l2.daemon.wait_for_log(r'channeld-{} chan #[0-9]*:\[IN\] 0101'.format(l3.info['id']), timeout=30)
         except TimeoutError:
             timedout = True
 
@@ -836,9 +911,9 @@ def test_htlc_send_timeout(node_factory, bitcoind):
     assert only_one(err.error['data']['failures'])['erring_channel'] == chanid2
 
     # L2 should send ping, but never receive pong so never send commitment.
-    l2.daemon.wait_for_log('channeld.*:\[OUT\] 0012')
-    assert not l2.daemon.is_in_log('channeld.*:\[IN\] 0013')
-    assert not l2.daemon.is_in_log('channeld.*:\[OUT\] 0084')
+    l2.daemon.wait_for_log(r'channeld.*:\[OUT\] 0012')
+    assert not l2.daemon.is_in_log(r'channeld.*:\[IN\] 0013')
+    assert not l2.daemon.is_in_log(r'channeld.*:\[OUT\] 0084')
     # L2 killed the channel with l3 because it was too slow.
     l2.daemon.wait_for_log('channeld-{}.*Adding HTLC too slow: killing channel'.format(l3.info['id']))
 
@@ -864,6 +939,7 @@ def test_ipv4_and_ipv6(node_factory):
         assert int(bind[0]['port']) == port
 
 
+@unittest.skipIf(not DEVELOPER, "Without DEVELOPER=1 we snap to FEERATE_FLOOR on testnets")
 def test_feerates(node_factory):
     l1 = node_factory.get_node(options={'log-level': 'io'}, start=False)
     l1.daemon.rpcproxy.mock_rpc('estimatesmartfee', {
@@ -961,3 +1037,101 @@ def test_crashlog(node_factory):
     assert not has_crash_log(l1)
     l1.daemon.proc.send_signal(signal.SIGSEGV)
     wait_for(lambda: has_crash_log(l1))
+
+
+def test_configfile_before_chdir(node_factory):
+    """Must read config file before chdir into lightning dir"""
+    l1 = node_factory.get_node()
+    l1.stop()
+
+    olddir = os.getcwd()
+    # as lightning_dir ends in /, basename and dirname don't work as expected.
+    os.chdir(os.path.dirname(l1.daemon.lightning_dir[:-1]))
+    config = os.path.join(os.path.basename(l1.daemon.lightning_dir[:-1]), "test_configfile")
+    # Test both an early arg and a normal arg.
+    with open(config, 'wb') as f:
+        f.write(b'always-use-proxy=true\n')
+        f.write(b'proxy=127.0.0.1:100\n')
+    l1.daemon.opts['conf'] = config
+
+    # Update executable to point to right place
+    l1.daemon.executable = os.path.join(olddir, l1.daemon.executable)
+    l1.start()
+    assert l1.rpc.listconfigs()['always-use-proxy']
+    assert l1.rpc.listconfigs()['proxy'] == '127.0.0.1:100'
+    os.chdir(olddir)
+
+
+def test_json_error(node_factory):
+    """Must return valid json even if it quotes our weirdness"""
+    l1 = node_factory.get_node()
+    with pytest.raises(RpcError, match=r'Given id is not a channel ID or short channel ID'):
+        l1.rpc.close({"tx": "020000000001011490f737edd2ea2175a032b58ea7cd426dfc244c339cd044792096da3349b18a0100000000ffffffff021c900300000000001600140e64868e2f752314bc82a154c8c5bf32f3691bb74da00b00000000002200205b8cd3b914cf67cdd8fa6273c930353dd36476734fbd962102c2df53b90880cd0247304402202b2e3195a35dc694bbbc58942dc9ba59cc01d71ba55c9b0ad0610ccd6a65633702201a849254453d160205accc00843efb0ad1fe0e186efa6a7cee1fb6a1d36c736a012103d745445c9362665f22e0d96e9e766f273f3260dea39c8a76bfa05dd2684ddccf00000000", "txid": "2128c10f0355354479514f4a23eaa880d94e099406d419bbb0d800143accddbb", "channel_id": "bbddcc3a1400d8b0bb19d40694094ed980a8ea234a4f5179443555030fc12820"})
+
+    # Should not corrupt following RPC
+    l1.rpc.getinfo()
+
+
+def test_check_command(node_factory):
+    l1 = node_factory.get_node()
+
+    l1.rpc.check(command_to_check='help')
+    l1.rpc.check(command_to_check='help', command='check')
+    # Note: this just checks form, not whether it's valid!
+    l1.rpc.check(command_to_check='help', command='badcommand')
+    with pytest.raises(RpcError, match=r'Unknown command'):
+        l1.rpc.check(command_to_check='badcommand')
+    with pytest.raises(RpcError, match=r'unknown parameter'):
+        l1.rpc.check(command_to_check='help', badarg='x')
+
+    # Ensures we have compulsory parameters.
+    with pytest.raises(RpcError, match=r'missing required parameter'):
+        l1.rpc.check(command_to_check='connect')
+    # Even with optional parameters.
+    with pytest.raises(RpcError, match=r'missing required parameter'):
+        l1.rpc.check(command_to_check='connect', host='x', port=77)
+    # Makes sure parameter types are correct.
+    with pytest.raises(RpcError, match=r'should be an integer'):
+        l1.rpc.check(command_to_check='connect', id='test', host='x', port="abcd")
+
+    # FIXME: python wrapper doesn't let us test array params.
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.connect(l1.rpc.socket_path)
+
+    sock.sendall(b'{"id":1, "jsonrpc":"2.0","method":"check","params":["help"]}')
+    obj, _ = l1.rpc._readobj(sock, b'')
+    assert obj['id'] == 1
+    assert 'result' in obj
+    assert 'error' not in obj
+
+    sock.sendall(b'{"id":1, "jsonrpc":"2.0","method":"check","params":["help", "check"]}')
+    obj, _ = l1.rpc._readobj(sock, b'')
+    assert obj['id'] == 1
+    assert 'result' in obj
+    assert 'error' not in obj
+
+    sock.sendall(b'{"id":1, "jsonrpc":"2.0","method":"check","params":["help", "a", "b"]}')
+    obj, _ = l1.rpc._readobj(sock, b'')
+    assert obj['id'] == 1
+    assert 'result' not in obj
+    assert 'error' in obj
+
+    sock.sendall(b'{"id":1, "jsonrpc":"2.0","method":"check","params":["badcommand"]}')
+    obj, _ = l1.rpc._readobj(sock, b'')
+    assert obj['id'] == 1
+    assert 'result' not in obj
+    assert 'error' in obj
+
+    sock.sendall(b'{"id":1, "jsonrpc":"2.0","method":"check","params":["connect"]}')
+    obj, _ = l1.rpc._readobj(sock, b'')
+    assert obj['id'] == 1
+    assert 'result' not in obj
+    assert 'error' in obj
+
+    sock.sendall(b'{"id":1, "jsonrpc":"2.0","method":"check","params":["connect", "test", "x", "abcd"]}')
+    obj, _ = l1.rpc._readobj(sock, b'')
+    assert obj['id'] == 1
+    assert 'result' not in obj
+    assert 'error' in obj
+
+    sock.close()

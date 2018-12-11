@@ -1,7 +1,7 @@
 from collections import namedtuple
 from fixtures import *  # noqa: F401,F403
 from lightning import RpcError
-from utils import DEVELOPER, only_one, wait_for, sync_blockheight, VALGRIND
+from utils import DEVELOPER, only_one, wait_for, sync_blockheight, VALGRIND, EXPERIMENTAL_FEATURES
 
 
 import os
@@ -801,9 +801,24 @@ def test_channel_persistence(node_factory, bitcoind, executor):
     l1.daemon.wait_for_log(' to ONCHAIN')
 
 
+def test_private_channel(node_factory):
+    l1, l2 = node_factory.line_graph(2, announce_channels=False, wait_for_announce=False)
+    l3, l4 = node_factory.line_graph(2, announce_channels=True, wait_for_announce=True)
+
+    assert l1.daemon.is_in_log('Will open private channel with node {}'.format(l2.info['id']))
+    assert not l2.daemon.is_in_log('Will open private channel with node {}'.format(l1.info['id']))
+    assert not l3.daemon.is_in_log('Will open private channel with node {}'.format(l4.info['id']))
+
+    l3.daemon.wait_for_log('Received node_announcement for node {}'.format(l4.info['id']))
+    l4.daemon.wait_for_log('Received node_announcement for node {}'.format(l3.info['id']))
+
+    assert not l1.daemon.is_in_log('Received node_announcement for node {}'.format(l2.info['id']))
+    assert not l2.daemon.is_in_log('Received node_announcement for node {}'.format(l1.info['id']))
+
+
 @unittest.skipIf(not DEVELOPER, "needs DEVELOPER=1 for --dev-broadcast-interval")
 def test_channel_reenable(node_factory):
-    l1, l2 = node_factory.line_graph(2, opts={'may_reconnect': True}, fundchannel=True, announce=True)
+    l1, l2 = node_factory.line_graph(2, opts={'may_reconnect': True}, fundchannel=True, wait_for_announce=True)
 
     l1.daemon.wait_for_log('Received node_announcement for node {}'.format(l2.info['id']))
     l2.daemon.wait_for_log('Received node_announcement for node {}'.format(l1.info['id']))
@@ -920,7 +935,7 @@ def test_update_fee_reconnect(node_factory, bitcoind):
     l1.set_feerates((14000, 14000, 3750))
     l1.daemon.wait_for_log('Setting REMOTE feerate to 14000')
     l2.daemon.wait_for_log('Setting LOCAL feerate to 14000')
-    l1.daemon.wait_for_log('dev_disconnect: \+WIRE_COMMITMENT_SIGNED')
+    l1.daemon.wait_for_log(r'dev_disconnect: \+WIRE_COMMITMENT_SIGNED')
 
     # Wait for reconnect....
     l1.daemon.wait_for_log('Applying feerate 14000 to LOCAL')
@@ -999,11 +1014,14 @@ def test_forget_channel(node_factory):
 
 def test_peerinfo(node_factory, bitcoind):
     l1, l2 = node_factory.line_graph(2, fundchannel=False, opts={'may_reconnect': True})
+    if EXPERIMENTAL_FEATURES:
+        lfeatures = '8a'
+    else:
+        lfeatures = '88'
     # Gossiping but no node announcement yet
     assert l1.rpc.getpeer(l2.info['id'])['connected']
     assert len(l1.rpc.getpeer(l2.info['id'])['channels']) == 0
-    assert l1.rpc.getpeer(l2.info['id'])['localfeatures'] == '8a'
-    assert l1.rpc.getpeer(l2.info['id'])['globalfeatures'] == ''
+    assert l1.rpc.getpeer(l2.info['id'])['localfeatures'] == lfeatures
 
     # Fund a channel to force a node announcement
     chan = l1.fund_channel(l2, 10**6)
@@ -1020,16 +1038,16 @@ def test_peerinfo(node_factory, bitcoind):
     assert only_one(nodes1)['globalfeatures'] == peer1['globalfeatures']
     assert only_one(nodes2)['globalfeatures'] == peer2['globalfeatures']
 
-    assert l1.rpc.getpeer(l2.info['id'])['localfeatures'] == '8a'
-    assert l2.rpc.getpeer(l1.info['id'])['localfeatures'] == '8a'
+    assert l1.rpc.getpeer(l2.info['id'])['localfeatures'] == lfeatures
+    assert l2.rpc.getpeer(l1.info['id'])['localfeatures'] == lfeatures
 
     # If it reconnects after db load, it should know features.
     l1.restart()
     bitcoind.generate_block(1)
     wait_for(lambda: l1.rpc.getpeer(l2.info['id'])['connected'])
     wait_for(lambda: l2.rpc.getpeer(l1.info['id'])['connected'])
-    assert l1.rpc.getpeer(l2.info['id'])['localfeatures'] == '8a'
-    assert l2.rpc.getpeer(l1.info['id'])['localfeatures'] == '8a'
+    assert l1.rpc.getpeer(l2.info['id'])['localfeatures'] == lfeatures
+    assert l2.rpc.getpeer(l1.info['id'])['localfeatures'] == lfeatures
 
     # Close the channel to forget the peer
     with pytest.raises(RpcError, match=r'Channel close negotiation not finished'):
@@ -1227,7 +1245,7 @@ def test_funder_feerate_reconnect(node_factory, bitcoind):
 
     # create fee update, causing disconnect.
     l1.set_feerates((15000, 7500, 3750))
-    l2.daemon.wait_for_log('dev_disconnect: \-WIRE_COMMITMENT_SIGNED')
+    l2.daemon.wait_for_log(r'dev_disconnect: \-WIRE_COMMITMENT_SIGNED')
 
     # Wait until they reconnect.
     l1.daemon.wait_for_log('Peer transient failure in CHANNELD_NORMAL')
@@ -1237,14 +1255,33 @@ def test_funder_feerate_reconnect(node_factory, bitcoind):
     l1.pay(l2, 200000000)
 
 
+def test_funder_simple_reconnect(node_factory, bitcoind):
+    """Sanity check that reconnection works with completely unused channels"""
+    # Set fees even so it doesn't send any commitments.
+    l1 = node_factory.get_node(may_reconnect=True,
+                               feerates=(7500, 7500, 7500))
+    l2 = node_factory.get_node(may_reconnect=True)
+    l1.rpc.connect(l2.info['id'], 'localhost', l2.port)
+    l1.fund_channel(l2, 10**6)
+
+    l1.rpc.disconnect(l2.info['id'], True)
+
+    # Wait until they reconnect.
+    wait_for(lambda: l1.rpc.getpeer(l2.info['id'])['connected'])
+
+    # Should work normally.
+    l1.pay(l2, 200000000)
+
+
 @unittest.skipIf(not DEVELOPER, "needs LIGHTNINGD_DEV_LOG_IO")
+@unittest.skipIf(not EXPERIMENTAL_FEATURES, "needs option_dataloss_protect")
 def test_dataloss_protection(node_factory, bitcoind):
     l1 = node_factory.get_node(may_reconnect=True, log_all_io=True)
     l2 = node_factory.get_node(may_reconnect=True, log_all_io=True)
 
     l1.rpc.connect(l2.info['id'], 'localhost', l2.port)
     # l1 should send out WIRE_INIT (0010)
-    l1.daemon.wait_for_log("\[OUT\] 0010"
+    l1.daemon.wait_for_log(r"\[OUT\] 0010"
                            # gflen == 0
                            "0000"
                            # lflen == 1
@@ -1261,7 +1298,7 @@ def test_dataloss_protection(node_factory, bitcoind):
     l2.start()
 
     # l1 should have sent WIRE_CHANNEL_REESTABLISH with option_data_loss_protect.
-    l1.daemon.wait_for_log("\[OUT\] 0088"
+    l1.daemon.wait_for_log(r"\[OUT\] 0088"
                            # channel_id
                            "[0-9a-f]{64}"
                            # next_local_commitment_number
@@ -1279,13 +1316,13 @@ def test_dataloss_protection(node_factory, bitcoind):
 
     # Make sure both sides consider it completely settled (has received both
     # REVOKE_AND_ACK)
-    l1.daemon.wait_for_logs(["\[IN\] 0085"] * 2)
-    l2.daemon.wait_for_logs(["\[IN\] 0085"] * 2)
+    l1.daemon.wait_for_logs([r"\[IN\] 0085"] * 2)
+    l2.daemon.wait_for_logs([r"\[IN\] 0085"] * 2)
 
     l2.restart()
 
     # l1 should have sent WIRE_CHANNEL_REESTABLISH with option_data_loss_protect.
-    l1.daemon.wait_for_log("\[OUT\] 0088"
+    l1.daemon.wait_for_log(r"\[OUT\] 0088"
                            # channel_id
                            "[0-9a-f]{64}"
                            # next_local_commitment_number
@@ -1375,7 +1412,7 @@ def test_fulfill_incoming_first(node_factory, bitcoind):
                                                    'dev-no-reconnect': None,
                                                    'disconnect': disconnects,
                                                    'cltv-final': 200}],
-                                         announce=True)
+                                         wait_for_announce=True)
 
     # This succeeds.
     l1.rpc.pay(l3.rpc.invoice(200000000, 'test_fulfill_incoming_first', 'desc')['bolt11'])
@@ -1415,14 +1452,40 @@ def test_restart_many_payments(node_factory):
     inchans = []
     for n in innodes:
         n.rpc.connect(l1.info['id'], 'localhost', l1.port)
-        inchans.append(n.fund_channel(l1, 10**6))
+        inchans.append(n.fund_channel(l1, 10**6, False))
 
     # Nodes with channels out of the main node
     outnodes = node_factory.get_nodes(len(innodes), opts={'may_reconnect': True})
     outchans = []
     for n in outnodes:
         n.rpc.connect(l1.info['id'], 'localhost', l1.port)
-        outchans.append(l1.fund_channel(n, 10**6))
+        outchans.append(l1.fund_channel(n, 10**6, False))
+
+    # Now do all the waiting at once: if !DEVELOPER, this can be *very* slow!
+    l1_logs = []
+    for i in range(len(innodes)):
+        scid = inchans[i]
+        l1_logs += [r'update for channel {}\(0\) now ACTIVE'.format(scid),
+                    r'update for channel {}\(1\) now ACTIVE'.format(scid),
+                    'to CHANNELD_NORMAL']
+        innodes[i].daemon.wait_for_logs([r'update for channel {}\(0\) now ACTIVE'
+                                         .format(scid),
+                                         r'update for channel {}\(1\) now ACTIVE'
+                                         .format(scid),
+                                         'to CHANNELD_NORMAL'])
+
+    for i in range(len(outnodes)):
+        scid = outchans[i]
+        l1_logs += [r'update for channel {}\(0\) now ACTIVE'.format(scid),
+                    r'update for channel {}\(1\) now ACTIVE'.format(scid),
+                    'to CHANNELD_NORMAL']
+        outnodes[i].daemon.wait_for_logs([r'update for channel {}\(0\) now ACTIVE'
+                                          .format(scid),
+                                          r'update for channel {}\(1\) now ACTIVE'
+                                          .format(scid),
+                                          'to CHANNELD_NORMAL'])
+
+    l1.daemon.wait_for_logs(l1_logs)
 
     # Manually create routes, get invoices
     Payment = namedtuple('Payment', ['innode', 'route', 'payment_hash'])

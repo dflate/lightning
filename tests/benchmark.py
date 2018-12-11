@@ -60,7 +60,7 @@ def test_single_payment(node_factory, benchmark):
 
 
 def test_forward_payment(node_factory, benchmark):
-    l1, l2, l3 = node_factory.line_graph(3, announce=True)
+    l1, l2, l3 = node_factory.line_graph(3, wait_for_announce=True)
 
     def do_pay(src, dest):
         invoice = dest.rpc.invoice(1000, 'invoice-{}'.format(random.random()), 'desc')['bolt11']
@@ -70,7 +70,7 @@ def test_forward_payment(node_factory, benchmark):
 
 
 def test_long_forward_payment(node_factory, benchmark):
-    nodes = node_factory.line_graph(21, announce=True)
+    nodes = node_factory.line_graph(21, wait_for_announce=True)
 
     def do_pay(src, dest):
         invoice = dest.rpc.invoice(1000, 'invoice-{}'.format(random.random()), 'desc')['bolt11']

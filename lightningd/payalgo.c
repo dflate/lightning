@@ -5,6 +5,9 @@
 #include <ccan/tal/str/str.h>
 #include <ccan/time/time.h>
 #include <common/bolt11.h>
+#include <common/json_command.h>
+#include <common/jsonrpc_errors.h>
+#include <common/param.h>
 #include <common/pseudorand.h>
 #include <common/timeout.h>
 #include <common/type_to_string.h>
@@ -12,10 +15,8 @@
 #include <gossipd/routing.h>
 #include <lightningd/json.h>
 #include <lightningd/jsonrpc.h>
-#include <lightningd/jsonrpc_errors.h>
 #include <lightningd/lightningd.h>
 #include <lightningd/log.h>
-#include <lightningd/param.h>
 #include <lightningd/subd.h>
 #include <sodium/randombytes.h>
 #include <wallet/wallet.h>
@@ -592,7 +593,9 @@ static void json_pay_stop_retrying(struct pay *pay)
 }
 
 static void json_pay(struct command *cmd,
-		     const char *buffer, const jsmntok_t *params)
+		     const char *buffer,
+		     const jsmntok_t *obj UNNEEDED,
+		     const jsmntok_t *params)
 {
 	double *riskfactor;
 	double *maxfeepercent;
@@ -695,8 +698,8 @@ static void json_pay(struct command *cmd,
 static const struct json_command pay_command = {
 	"pay",
 	json_pay,
-	"Send payment specified by {bolt11} with optional {mgro} "
-	"(if and only if {bolt11} does not have amount), "
+	"Send payment specified by {bolt11} with {mgro} "
+	"(ignored if {bolt11} has an amount), "
 	"{description} (required if {bolt11} uses description hash), "
 	"{riskfactor} (default 1.0), "
 	"{maxfeepercent} (default 0.5) the maximum acceptable fee as a percentage (e.g. 0.5 => 0.5%), "

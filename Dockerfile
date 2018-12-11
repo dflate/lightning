@@ -15,7 +15,7 @@ RUN mkdir /opt/groestlcoin && cd /opt/groestlcoin \
     && echo "$GROESTLCOIN_SHA256  groestlcoin.tar.gz" | sha256sum -c - \
     && tar -xzvf groestlcoin.tar.gz groestlcoin-cli --exclude=*-qt \
     && rm groestlcoin.tar.gz
-    
+
 ENV LIGHTNINGD_VERSION=master
 
 WORKDIR /opt/lightningd
@@ -43,7 +43,7 @@ FROM microsoft/dotnet:2.2-runtime-deps-stretch-slim
 RUN apt-get update && apt-get install -y \
 	autoconf automake build-essential git libtool libgmp-dev \
 	libsqlite3-dev python python3 net-tools zlib1g-dev
-  
+
 ENV LIGHTNINGD_DATA=/root/.lightning
 ENV LIGHTNINGD_RPC_PORT=9835
 

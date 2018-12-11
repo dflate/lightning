@@ -4,7 +4,10 @@
 #include <ccan/list/list.h>
 #include <ccan/tal/str/str.h>
 #include <common/features.h>
+#include <common/json_command.h>
+#include <common/jsonrpc_errors.h>
 #include <common/memleak.h>
+#include <common/param.h>
 #include <common/pseudorand.h>
 #include <common/timeout.h>
 #include <common/wireaddr.h>
@@ -16,12 +19,11 @@
 #include <lightningd/connect_control.h>
 #include <lightningd/hsm_control.h>
 #include <lightningd/json.h>
+#include <lightningd/json_stream.h>
 #include <lightningd/jsonrpc.h>
-#include <lightningd/jsonrpc_errors.h>
 #include <lightningd/lightningd.h>
 #include <lightningd/log.h>
 #include <lightningd/opening_control.h>
-#include <lightningd/param.h>
 #include <lightningd/peer_control.h>
 #include <lightningd/subd.h>
 #include <wire/gen_peer_wire.h>
@@ -73,7 +75,9 @@ static void connect_cmd_succeed(struct command *cmd, const struct pubkey *id)
 }
 
 static void json_connect(struct command *cmd,
-			 const char *buffer, const jsmntok_t *params)
+			 const char *buffer,
+			 const jsmntok_t *obj UNNEEDED,
+			 const jsmntok_t *params)
 {
 	u32 *port;
 	jsmntok_t *idtok;
@@ -290,9 +294,11 @@ static unsigned connectd_msg(struct subd *connectd, const u8 *msg, const int *fd
 	case WIRE_CONNECTCTL_ACTIVATE:
 	case WIRE_CONNECTCTL_CONNECT_TO_PEER:
 	case WIRE_CONNECTCTL_PEER_DISCONNECTED:
+	case WIRE_CONNECT_DEV_MEMLEAK:
 	/* This is a reply, so never gets through to here. */
 	case WIRE_CONNECTCTL_INIT_REPLY:
 	case WIRE_CONNECTCTL_ACTIVATE_REPLY:
+	case WIRE_CONNECT_DEV_MEMLEAK_REPLY:
 		break;
 
 	case WIRE_CONNECT_RECONNECTED:
@@ -364,8 +370,7 @@ int connectd_init(struct lightningd *ld)
 
 	msg = towire_connectctl_init(
 	    tmpctx, &ld->id,
-	    get_offered_globalfeatures(tmpctx),
-	    get_offered_localfeatures(tmpctx), wireaddrs,
+	    wireaddrs,
 	    listen_announce,
 	    ld->proxyaddr, ld->use_proxy_always || ld->pure_tor_setup,
 	    allow_localhost, ld->config.use_dns,

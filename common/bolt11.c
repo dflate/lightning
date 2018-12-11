@@ -467,11 +467,19 @@ struct bolt11 *bolt11_decode(const tal_t *ctx, const char *str,
 
         b11->routes = tal_arr(b11, struct route_info *, 0);
 
-        if (!strstarts(str, "ln"))
-                return decode_fail(b11, fail, "Invoices must start with ln");
+	/* BOLT #11:
+	 *
+	 * If a URI scheme is desired, the current recommendation is to either
+	 * use 'lightning:' as a prefix before the BOLT-11 encoding
+	 */
+	if (strstarts(str, "lightning:") || strstarts(str, "LIGHTNING:"))
+		str += strlen("lightning:");
 
-        hrp = tal_arr(tmpctx, char, strlen(str));
-        data = tal_arr(tmpctx, u5, strlen(str));
+        if (strlen(str) < 8)
+                return decode_fail(b11, fail, "Bad bech32 string");
+
+        hrp = tal_arr(tmpctx, char, strlen(str) - 6);
+        data = tal_arr(tmpctx, u5, strlen(str) - 8);
 
         if (!bech32_decode(hrp, data, &data_len, str, (size_t)-1))
                 return decode_fail(b11, fail, "Bad bech32 string");

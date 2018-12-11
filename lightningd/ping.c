@@ -1,14 +1,15 @@
 #include <channeld/gen_channel_wire.h>
+#include <common/json_command.h>
+#include <common/jsonrpc_errors.h>
+#include <common/param.h>
 #include <common/sphinx.h>
 #include <common/utils.h>
 #include <gossipd/gen_gossip_wire.h>
 #include <lightningd/htlc_end.h>
 #include <lightningd/json.h>
 #include <lightningd/jsonrpc.h>
-#include <lightningd/jsonrpc_errors.h>
 #include <lightningd/lightningd.h>
 #include <lightningd/log.h>
-#include <lightningd/param.h>
 #include <lightningd/peer_control.h>
 #include <lightningd/ping.h>
 #include <lightningd/subd.h>
@@ -79,7 +80,9 @@ void ping_reply(struct subd *subd, const u8 *msg)
 }
 
 static void json_ping(struct command *cmd,
-		      const char *buffer, const jsmntok_t *params)
+		      const char *buffer,
+		      const jsmntok_t *obj UNNEEDED,
+		      const jsmntok_t *params)
 {
 	u8 *msg;
 	unsigned int *len, *pongbytes;

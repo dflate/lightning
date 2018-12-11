@@ -11,6 +11,10 @@
 #include <ccan/take/take.h>
 #include <ccan/tal/str/str.h>
 #include <common/features.h>
+#include <common/json_command.h>
+#include <common/json_escaped.h>
+#include <common/jsonrpc_errors.h>
+#include <common/param.h>
 #include <common/type_to_string.h>
 #include <common/utils.h>
 #include <errno.h>
@@ -22,12 +26,9 @@
 #include <lightningd/gossip_msg.h>
 #include <lightningd/hsm_control.h>
 #include <lightningd/json.h>
-#include <lightningd/json_escaped.h>
 #include <lightningd/jsonrpc.h>
-#include <lightningd/jsonrpc_errors.h>
 #include <lightningd/log.h>
 #include <lightningd/options.h>
-#include <lightningd/param.h>
 #include <lightningd/ping.h>
 #include <sodium/randombytes.h>
 #include <string.h>
@@ -107,8 +108,6 @@ static unsigned gossip_msg(struct subd *gossip, const u8 *msg, const int *fds)
 	case WIRE_GOSSIP_GETCHANNELS_REQUEST:
 	case WIRE_GOSSIP_PING:
 	case WIRE_GOSSIP_GET_CHANNEL_PEER:
-	case WIRE_GOSSIP_GET_UPDATE:
-	case WIRE_GOSSIP_SEND_GOSSIP:
 	case WIRE_GOSSIP_GET_TXOUT_REPLY:
 	case WIRE_GOSSIP_OUTPOINT_SPENT:
 	case WIRE_GOSSIP_ROUTING_FAILURE:
@@ -119,8 +118,9 @@ static unsigned gossip_msg(struct subd *gossip, const u8 *msg, const int *fds)
 	case WIRE_GOSSIP_GET_INCOMING_CHANNELS:
 	case WIRE_GOSSIP_DEV_SET_MAX_SCIDS_ENCODE_SIZE:
 	case WIRE_GOSSIP_DEV_SUPPRESS:
+	case WIRE_GOSSIP_LOCAL_CHANNEL_CLOSE:
+	case WIRE_GOSSIP_DEV_MEMLEAK:
 	/* This is a reply, so never gets through to here. */
-	case WIRE_GOSSIP_GET_UPDATE_REPLY:
 	case WIRE_GOSSIP_GETNODES_REPLY:
 	case WIRE_GOSSIP_GETROUTE_REPLY:
 	case WIRE_GOSSIP_GETCHANNELS_REPLY:
@@ -128,10 +128,7 @@ static unsigned gossip_msg(struct subd *gossip, const u8 *msg, const int *fds)
 	case WIRE_GOSSIP_QUERY_CHANNEL_RANGE_REPLY:
 	case WIRE_GOSSIP_GET_CHANNEL_PEER_REPLY:
 	case WIRE_GOSSIP_GET_INCOMING_CHANNELS_REPLY:
-	/* These are inter-daemon messages, not received by us */
-	case WIRE_GOSSIP_LOCAL_ADD_CHANNEL:
-	case WIRE_GOSSIP_LOCAL_CHANNEL_UPDATE:
-	case WIRE_GOSSIP_LOCAL_CHANNEL_CLOSE:
+	case WIRE_GOSSIP_DEV_MEMLEAK_REPLY:
 		break;
 
 	case WIRE_GOSSIP_PING_REPLY:
@@ -247,8 +244,10 @@ static void json_getnodes_reply(struct subd *gossip UNUSED, const u8 *reply,
 	command_success(cmd, response);
 }
 
-static void json_listnodes(struct command *cmd, const char *buffer,
-			  const jsmntok_t *params)
+static void json_listnodes(struct command *cmd,
+			   const char *buffer,
+			   const jsmntok_t *obj UNNEEDED,
+			   const jsmntok_t *params)
 {
 	u8 *req;
 	struct pubkey *id;
@@ -290,7 +289,10 @@ static void json_getroute_reply(struct subd *gossip UNUSED, const u8 *reply, con
 	command_success(cmd, response);
 }
 
-static void json_getroute(struct command *cmd, const char *buffer, const jsmntok_t *params)
+static void json_getroute(struct command *cmd,
+			  const char *buffer,
+			  const jsmntok_t *obj UNNEEDED,
+			  const jsmntok_t *params)
 {
 	struct lightningd *ld = cmd->ld;
 	struct pubkey *destination;
@@ -397,8 +399,10 @@ static void json_listchannels_reply(struct subd *gossip UNUSED, const u8 *reply,
 	command_success(cmd, response);
 }
 
-static void json_listchannels(struct command *cmd, const char *buffer,
-			     const jsmntok_t *params)
+static void json_listchannels(struct command *cmd,
+			      const char *buffer,
+			      const jsmntok_t *obj UNNEEDED,
+			      const jsmntok_t *params)
 {
 	u8 *req;
 	struct short_channel_id *id;
@@ -447,7 +451,9 @@ static void json_scids_reply(struct subd *gossip UNUSED, const u8 *reply,
 }
 
 static void json_dev_query_scids(struct command *cmd,
-				 const char *buffer, const jsmntok_t *params)
+				 const char *buffer,
+				 const jsmntok_t *obj UNNEEDED,
+				 const jsmntok_t *params)
 {
 	u8 *msg;
 	const jsmntok_t *scidstok;
@@ -490,6 +496,7 @@ AUTODATA(json_command, &dev_query_scids_command);
 
 static void json_dev_send_timestamp_filter(struct command *cmd,
 					   const char *buffer,
+					   const jsmntok_t *obj UNNEEDED,
 					   const jsmntok_t *params)
 {
 	u8 *msg;
@@ -559,6 +566,7 @@ static void json_channel_range_reply(struct subd *gossip UNUSED, const u8 *reply
 
 static void json_dev_query_channel_range(struct command *cmd,
 					 const char *buffer,
+					 const jsmntok_t *obj UNNEEDED,
 					 const jsmntok_t *params)
 {
 	u8 *msg;
@@ -588,6 +596,7 @@ AUTODATA(json_command, &dev_query_channel_range_command);
 
 static void json_dev_set_max_scids_encode_size(struct command *cmd,
 					       const char *buffer,
+					       const jsmntok_t *obj UNNEEDED,
 					       const jsmntok_t *params)
 {
 	u8 *msg;
@@ -613,6 +622,7 @@ AUTODATA(json_command, &dev_set_max_scids_encode_size);
 
 static void json_dev_suppress_gossip(struct command *cmd,
 				     const char *buffer,
+				     const jsmntok_t *obj UNNEEDED,
 				     const jsmntok_t *params)
 {
 	if (!param(cmd, buffer, params, NULL))

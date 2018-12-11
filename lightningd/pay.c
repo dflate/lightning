@@ -2,16 +2,17 @@
 #include <ccan/str/hex/hex.h>
 #include <ccan/tal/str/str.h>
 #include <common/bolt11.h>
+#include <common/json_command.h>
+#include <common/jsonrpc_errors.h>
+#include <common/param.h>
 #include <common/timeout.h>
 #include <gossipd/gen_gossip_wire.h>
 #include <lightningd/chaintopology.h>
 #include <lightningd/json.h>
 #include <lightningd/jsonrpc.h>
-#include <lightningd/jsonrpc_errors.h>
 #include <lightningd/lightningd.h>
 #include <lightningd/log.h>
 #include <lightningd/options.h>
-#include <lightningd/param.h>
 #include <lightningd/peer_control.h>
 #include <lightningd/peer_htlcs.h>
 #include <lightningd/subd.h>
@@ -941,7 +942,9 @@ static void json_sendpay_on_resolve(const struct sendpay_result* r,
 }
 
 static void json_sendpay(struct command *cmd,
-			 const char *buffer, const jsmntok_t *params)
+			 const char *buffer,
+			 const jsmntok_t *obj UNNEEDED,
+			 const jsmntok_t *params)
 {
 	const jsmntok_t *routetok;
 	const jsmntok_t *t, *end;
@@ -1025,7 +1028,9 @@ static void waitsendpay_timeout(struct command *cmd)
 	command_fail(cmd, PAY_IN_PROGRESS, "Timed out while waiting");
 }
 
-static void json_waitsendpay(struct command *cmd, const char *buffer,
+static void json_waitsendpay(struct command *cmd,
+			     const char *buffer,
+			     const jsmntok_t *obj UNNEEDED,
 			     const jsmntok_t *params)
 {
 	struct sha256 *rhash;
@@ -1054,8 +1059,10 @@ static const struct json_command waitsendpay_command = {
 };
 AUTODATA(json_command, &waitsendpay_command);
 
-static void json_listpayments(struct command *cmd, const char *buffer,
-			       const jsmntok_t *params)
+static void json_listpayments(struct command *cmd,
+			      const char *buffer,
+			      const jsmntok_t *obj UNNEEDED,
+			      const jsmntok_t *params)
 {
 	const struct wallet_payment **payments;
 	struct json_stream *response;

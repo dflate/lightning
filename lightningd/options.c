@@ -10,7 +10,11 @@
 #include <ccan/tal/path/path.h>
 #include <ccan/tal/str/str.h>
 #include <common/configdir.h>
+#include <common/json_command.h>
+#include <common/json_escaped.h>
+#include <common/jsonrpc_errors.h>
 #include <common/memleak.h>
+#include <common/param.h>
 #include <common/version.h>
 #include <common/wireaddr.h>
 #include <errno.h>
@@ -19,13 +23,11 @@
 #include <lightningd/bitcoind.h>
 #include <lightningd/chaintopology.h>
 #include <lightningd/json.h>
-#include <lightningd/json_escaped.h>
 #include <lightningd/jsonrpc.h>
-#include <lightningd/jsonrpc_errors.h>
 #include <lightningd/lightningd.h>
 #include <lightningd/log.h>
 #include <lightningd/options.h>
-#include <lightningd/param.h>
+#include <lightningd/plugin.h>
 #include <lightningd/subd.h>
 #include <stdio.h>
 #include <string.h>
@@ -286,11 +288,50 @@ static char *opt_add_proxy_addr(const char *arg, struct lightningd *ld)
 	return NULL;
 }
 
+static char *opt_add_plugin(const char *arg, struct lightningd *ld)
+{
+	plugin_register(ld->plugins, arg);
+	return NULL;
+}
+
+static char *opt_disable_plugin(const char *arg, struct lightningd *ld)
+{
+	if (plugin_remove(ld->plugins, arg))
+		return NULL;
+	return tal_fmt(NULL, "Could not find plugin %s", arg);
+}
+
+static char *opt_add_plugin_dir(const char *arg, struct lightningd *ld)
+{
+	return add_plugin_dir(ld->plugins, arg, false);
+}
+
+static char *opt_clear_plugins(struct lightningd *ld)
+{
+	clear_plugins(ld->plugins);
+	return NULL;
+}
+
 static void config_register_opts(struct lightningd *ld)
 {
 	opt_register_early_arg("--conf=<file>", opt_set_talstr, NULL,
 		&ld->config_filename,
 		"Specify configuration file. Relative paths will be prefixed by lightning-dir location. (default: config)");
+
+	/* Register plugins as an early args, so we can initialize them and have
+	 * them register more command line options */
+	opt_register_early_arg("--plugin", opt_add_plugin, NULL, ld,
+			       "Add a plugin to be run (can be used multiple times)");
+	opt_register_early_arg("--plugin-dir", opt_add_plugin_dir,
+			       NULL, ld,
+			       "Add a directory to load plugins from (can be used multiple times)");
+	opt_register_early_noarg("--clear-plugins", opt_clear_plugins,
+				 ld,
+				 "Remove all plugins added before this option");
+	opt_register_early_arg("--disable-plugin", opt_disable_plugin,
+			       NULL, ld,
+			       "Disable a particular plugin by filename/name");
+
 	opt_register_noarg("--daemon", opt_set_bool, &ld->daemon,
 			 "Run in the background, suppress stdout/stderr");
 	opt_register_arg("--ignore-fee-limits", opt_set_bool_arg, opt_show_bool,
@@ -395,6 +436,12 @@ static void config_register_opts(struct lightningd *ld)
 }
 
 #if DEVELOPER
+static char *opt_subprocess_debug(const char *optarg, struct lightningd *ld)
+{
+	ld->dev_debug_subprocess = optarg;
+	return NULL;
+}
+
 static void dev_register_opts(struct lightningd *ld)
 {
 	opt_register_noarg("--dev-no-reconnect", opt_set_invbool,
@@ -402,8 +449,8 @@ static void dev_register_opts(struct lightningd *ld)
 			   "Disable automatic reconnect attempts");
 	opt_register_noarg("--dev-fail-on-subdaemon-fail", opt_set_bool,
 			   &ld->dev_subdaemon_fail, opt_hidden);
-	opt_register_arg("--dev-debugger=<subdaemon>", opt_subd_debug, NULL,
-			 ld, "Invoke gdb at start of <subdaemon>");
+	opt_register_early_arg("--dev-debugger=<subprocess>", opt_subprocess_debug, NULL,
+			 ld, "Invoke gdb at start of <subprocess>");
 	opt_register_arg("--dev-broadcast-interval=<ms>", opt_set_uintval,
 			 opt_show_uintval, &ld->config.broadcast_interval_msec,
 			 "Time between gossip broadcasts in milliseconds");
@@ -610,8 +657,11 @@ static void config_log_stderr_exit(const char *fmt, ...)
 	fatal("%s", msg);
 }
 
-/* We turn the config file into cmdline arguments. */
-static void opt_parse_from_config(struct lightningd *ld)
+/**
+ * We turn the config file into cmdline arguments. @early tells us
+ * whether to parse early options only, or the non-early options.
+ */
+static void opt_parse_from_config(struct lightningd *ld, bool early)
 {
 	char *contents, **lines;
 	char **all_args; /*For each line: either argument string or NULL*/
@@ -640,7 +690,7 @@ static void opt_parse_from_config(struct lightningd *ld)
 	lines = tal_strsplit(contents, contents, "\r\n", STR_NO_EMPTY);
 
 	/* We have to keep all_args around, since opt will point into it */
-	all_args = tal_arr(ld, char *, tal_count(lines) - 1);
+	all_args = notleak(tal_arr(ld, char *, tal_count(lines) - 1));
 
 	for (i = 0; i < tal_count(lines) - 1; i++) {
 		if (strstarts(lines[i], "#")) {
@@ -660,23 +710,28 @@ static void opt_parse_from_config(struct lightningd *ld)
 	argv[0] = "lightning config file";
 	argv[argc] = NULL;
 
-	for (i = 0; i < tal_count(all_args); i++) {
-		if(all_args[i] != NULL) {
-			config_parse_line_number = i + 1;
-			argv[1] = all_args[i];
-			opt_early_parse(argc, argv, config_log_stderr_exit);
+	if (early) {
+		for (i = 0; i < tal_count(all_args); i++) {
+			if (all_args[i] != NULL) {
+				config_parse_line_number = i + 1;
+				argv[1] = all_args[i];
+				opt_early_parse(argc, argv,
+						config_log_stderr_exit);
+			}
 		}
-	}
 
-	/* Now we can set up defaults, depending on whether testnet or not */
-	setup_default_config(ld);
+		/* Now we can set up defaults, depending on whether testnet or
+		 * not */
+		setup_default_config(ld);
+	} else {
 
-	for (i = 0; i < tal_count(all_args); i++) {
-		if(all_args[i] != NULL) {
-			config_parse_line_number = i + 1;
-			argv[1] = all_args[i];
-			opt_parse(&argc, argv, config_log_stderr_exit);
-			argc = 2; /* opt_parse might have changed it  */
+		for (i = 0; i < tal_count(all_args); i++) {
+			if (all_args[i] != NULL) {
+				config_parse_line_number = i + 1;
+				argv[1] = all_args[i];
+				opt_parse(&argc, argv, config_log_stderr_exit);
+				argc = 2; /* opt_parse might have changed it  */
+			}
 		}
 	}
 
@@ -707,7 +762,7 @@ void register_opts(struct lightningd *ld)
 {
 	opt_set_alloc(opt_allocfn, tal_reallocfn, tal_freefn);
 
-	opt_register_early_noarg("--help|-h", opt_lightningd_usage, ld,
+	opt_register_noarg("--help|-h", opt_lightningd_usage, ld,
 				 "Print this message.");
 	opt_register_early_noarg("--test-daemons-only",
 				 test_subdaemons_and_exit,
@@ -804,17 +859,26 @@ void setup_color_and_alias(struct lightningd *ld)
 	}
 }
 
-void handle_opts(struct lightningd *ld, int argc, char *argv[])
+void handle_early_opts(struct lightningd *ld, int argc, char *argv[])
 {
 	/* Load defaults. The actual values loaded here will be overwritten
 	 * later by opt_parse_from_config. */
 	setup_default_config(ld);
 
 	/* Get any configdir/testnet options first. */
-	opt_early_parse(argc, argv, opt_log_stderr_exit);
+	opt_early_parse_incomplete(argc, argv, opt_log_stderr_exit);
 
-	/* Now look for config file */
-	opt_parse_from_config(ld);
+	/* Now look for config file, but only handle the early
+	 * options, others may be added on-demand */
+	opt_parse_from_config(ld, true);
+}
+
+void handle_opts(struct lightningd *ld, int argc, char *argv[])
+{
+	/* Now look for config file, but only handle non-early
+	 * options, early ones have been parsed in
+	 * handle_early_opts */
+	opt_parse_from_config(ld, false);
 
 	/* Move to config dir, to save ourselves the hassle of path manip. */
 	if (chdir(ld->config_dir) != 0) {
@@ -890,7 +954,9 @@ static void add_config(struct lightningd *ld,
 		    || opt->cb == (void *)opt_set_testnet
 		    || opt->cb == (void *)opt_set_mainnet
 		    || opt->cb == (void *)opt_lightningd_usage
-		    || opt->cb == (void *)test_subdaemons_and_exit) {
+		    || opt->cb == (void *)test_subdaemons_and_exit
+		    /* FIXME: we can't recover this. */
+		    || opt->cb == (void *)opt_clear_plugins) {
 			/* These are not important */
 		} else if (opt->cb == (void *)opt_set_bool) {
 			const bool *b = opt->u.carg;
@@ -961,6 +1027,12 @@ static void add_config(struct lightningd *ld,
 		} else if (opt->cb_arg == (void *)opt_add_proxy_addr) {
 			if (ld->proxyaddr)
 				answer = fmt_wireaddr(name0, ld->proxyaddr);
+		} else if (opt->cb_arg == (void *)opt_add_plugin) {
+			json_add_opt_plugins(response, ld->plugins);
+		} else if (opt->cb_arg == (void *)opt_add_plugin_dir
+			   || opt->cb_arg == (void *)opt_disable_plugin) {
+			/* FIXME: We actually treat it as if they specified
+			 * --plugin for each one, so ignore these */
 #if DEVELOPER
 		} else if (strstarts(name, "dev-")) {
 			/* Ignore dev settings */
@@ -979,7 +1051,9 @@ static void add_config(struct lightningd *ld,
 }
 
 static void json_listconfigs(struct command *cmd,
-			     const char *buffer, const jsmntok_t *params)
+			     const char *buffer,
+			     const jsmntok_t *obj UNNEEDED,
+			     const jsmntok_t *params)
 {
 	size_t i;
 	struct json_stream *response = NULL;

@@ -4,6 +4,7 @@
 #include <common/crypto_sync.h>
 #include <common/derive_basepoints.h>
 #include <common/htlc.h>
+#include <common/memleak.h>
 #include <common/peer_billboard.h>
 #include <common/peer_failed.h>
 #include <common/read_peer_msg.h>
@@ -103,7 +104,8 @@ static void do_reconnect(struct crypto_state *cs,
 			 const struct channel_id *channel_id,
 			 const u64 next_index[NUM_SIDES],
 			 u64 revocations_received,
-			 const u8 *channel_reestablish)
+			 const u8 *channel_reestablish,
+			 const u8 *final_scriptpubkey)
 {
 	u8 *msg;
 	struct channel_id their_channel_id;
@@ -147,6 +149,17 @@ static void do_reconnect(struct crypto_state *cs,
 		     next_local_commitment_number,
 		     next_remote_revocation_number);
 
+	/* BOLT #2:
+	 *
+	 * A node:
+	 *...
+	 *   - upon reconnection:
+	 *     - if it has sent a previous `shutdown`:
+	 *       - MUST retransmit `shutdown`.
+	 */
+	msg = towire_shutdown(NULL, channel_id, final_scriptpubkey);
+	sync_crypto_write(cs, PEER_FD, take(msg));
+
 	/* FIXME: Spec says to re-xmit funding_locked here if we haven't
 	 * done any updates. */
 }
@@ -164,7 +177,7 @@ static void send_offer(struct crypto_state *cs,
 		       uint64_t fee_to_offer)
 {
 	struct bitcoin_tx *tx;
-	secp256k1_ecdsa_signature our_sig;
+	struct bitcoin_signature our_sig;
 	u8 *msg;
 
 	/* BOLT #2:
@@ -202,11 +215,12 @@ static void send_offer(struct crypto_state *cs,
 
 	status_trace("sending fee offer %"PRIu64, fee_to_offer);
 
-	msg = towire_closing_signed(NULL, channel_id, fee_to_offer, &our_sig);
+	assert(our_sig.sighash_type == SIGHASH_ALL);
+	msg = towire_closing_signed(NULL, channel_id, fee_to_offer, &our_sig.s);
 	sync_crypto_write(cs, PEER_FD, take(msg));
 }
 
-static void tell_master_their_offer(const secp256k1_ecdsa_signature *their_sig,
+static void tell_master_their_offer(const struct bitcoin_signature *their_sig,
 				    const struct bitcoin_tx *tx)
 {
 	u8 *msg = towire_closing_received_signature(NULL, their_sig, tx);
@@ -239,7 +253,7 @@ static uint64_t receive_offer(struct crypto_state *cs,
 	u8 *msg;
 	struct channel_id their_channel_id;
 	u64 received_fee;
-	secp256k1_ecdsa_signature their_sig;
+	struct bitcoin_signature their_sig;
 	struct bitcoin_tx *tx;
 
 	/* Wait for them to say something interesting */
@@ -263,8 +277,9 @@ static uint64_t receive_offer(struct crypto_state *cs,
 			msg = tal_free(msg);
 	} while (!msg);
 
+	their_sig.sighash_type = SIGHASH_ALL;
 	if (!fromwire_closing_signed(msg, &their_channel_id,
-				     &received_fee, &their_sig))
+				     &received_fee, &their_sig.s))
 		peer_failed(cs, channel_id,
 			    "Expected closing_signed: %s",
 			    tal_hex(tmpctx, msg));
@@ -414,6 +429,27 @@ static u64 adjust_offer(struct crypto_state *cs,
 	return (feerange->max + min_fee_to_accept)/2;
 }
 
+#if DEVELOPER
+/* FIXME: We should talk to lightningd anyway, rather than doing this */
+static void closing_dev_memleak(const tal_t *ctx,
+				u8 *scriptpubkey[NUM_SIDES],
+				const u8 *funding_wscript)
+{
+	struct htable *memtable;
+
+	memtable = memleak_enter_allocations(tmpctx,
+					     scriptpubkey[LOCAL],
+					     scriptpubkey[REMOTE]);
+
+	/* Now delete known pointers (these aren't really roots, just
+	 * pointers we know are referenced).*/
+	memleak_remove_referenced(memtable, ctx);
+	memleak_remove_referenced(memtable, funding_wscript);
+
+	dump_memleak(memtable);
+}
+#endif /* DEVELOPER */
+
 int main(int argc, char *argv[])
 {
 	setup_locale();
@@ -429,7 +465,7 @@ int main(int argc, char *argv[])
 	u64 min_fee_to_accept, commitment_fee, offer[NUM_SIDES];
 	struct feerange feerange;
 	enum side funder;
-	u8 *scriptpubkey[NUM_SIDES], *funding_wscript;
+	u8 *scriptpubkey[NUM_SIDES], *funding_wscript, *final_scriptpubkey;
 	struct channel_id channel_id;
 	bool reconnected;
 	u64 next_index[NUM_SIDES], revocations_received;
@@ -459,7 +495,8 @@ int main(int argc, char *argv[])
 				   &next_index[LOCAL],
 				   &next_index[REMOTE],
 				   &revocations_received,
-				   &channel_reestablish))
+				   &channel_reestablish,
+				   &final_scriptpubkey))
 		master_badmsg(WIRE_CLOSING_INIT, msg);
 
 	status_trace("satoshi_out = %"PRIu64"/%"PRIu64,
@@ -475,7 +512,10 @@ int main(int argc, char *argv[])
 	if (reconnected)
 		do_reconnect(&cs, &channel_id,
 			     next_index, revocations_received,
-			     channel_reestablish);
+			     channel_reestablish, final_scriptpubkey);
+
+	/* We don't need this any more */
+	tal_free(final_scriptpubkey);
 
 	peer_billboard(true, "Negotiating closing fee between %"PRIu64
 		       " and %"PRIu64" satoshi (ideal %"PRIu64")",
@@ -563,6 +603,11 @@ int main(int argc, char *argv[])
 
 	peer_billboard(true, "We agreed on a closing fee of %"PRIu64" satoshi",
 		       offer[LOCAL]);
+
+#if DEVELOPER
+	/* We don't listen for master commands, so always check memleak here */
+	closing_dev_memleak(ctx, scriptpubkey, funding_wscript);
+#endif
 
 	/* We're done! */
 	/* Properly close the channel first. */

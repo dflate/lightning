@@ -13,6 +13,7 @@
 #include <common/gen_peer_status_wire.h>
 #include <common/initial_channel.h>
 #include <common/key_derive.h>
+#include <common/memleak.h>
 #include <common/peer_billboard.h>
 #include <common/peer_failed.h>
 #include <common/pseudorand.h>
@@ -344,7 +345,7 @@ static u8 *funder_channel(struct state *state,
 	struct basepoints theirs;
 	struct pubkey their_funding_pubkey;
 	struct pubkey *changekey;
-	secp256k1_ecdsa_signature sig;
+	struct bitcoin_signature sig;
 	u32 minimum_depth;
 	const u8 *wscript;
 	struct bitcoin_tx *funding;
@@ -550,7 +551,7 @@ static u8 *funder_channel(struct state *state,
 			      tal_hex(tmpctx, msg));
 
 	status_trace("signature %s on tx %s using key %s",
-		     type_to_string(tmpctx, secp256k1_ecdsa_signature, &sig),
+		     type_to_string(tmpctx, struct bitcoin_signature, &sig),
 		     type_to_string(tmpctx, struct bitcoin_tx, tx),
 		     type_to_string(tmpctx, struct pubkey,
 				    &state->our_funding_pubkey));
@@ -558,7 +559,7 @@ static u8 *funder_channel(struct state *state,
 	msg = towire_funding_created(state, &state->channel_id,
 				     &state->funding_txid,
 				     state->funding_txout,
-				     &sig);
+				     &sig.s);
 	sync_crypto_write(&state->cs, PEER_FD, msg);
 
 	/* BOLT #2:
@@ -576,7 +577,8 @@ static u8 *funder_channel(struct state *state,
 	if (!msg)
 		return NULL;
 
-	if (!fromwire_funding_signed(msg, &id_in, &sig))
+	sig.sighash_type = SIGHASH_ALL;
+	if (!fromwire_funding_signed(msg, &id_in, &sig.s))
 		peer_failed(&state->cs,
 			    &state->channel_id,
 			    "Parsing funding_signed: %s", tal_hex(msg, msg));
@@ -617,7 +619,7 @@ static u8 *funder_channel(struct state *state,
 		peer_failed(&state->cs,
 			    &state->channel_id,
 			    "Bad signature %s on tx %s using key %s",
-			    type_to_string(tmpctx, secp256k1_ecdsa_signature,
+			    type_to_string(tmpctx, struct bitcoin_signature,
 					   &sig),
 			    type_to_string(tmpctx, struct bitcoin_tx, tx),
 			    type_to_string(tmpctx, struct pubkey,
@@ -655,7 +657,7 @@ static u8 *fundee_channel(struct state *state, const u8 *open_channel_msg)
 	struct channel_id id_in;
 	struct basepoints theirs;
 	struct pubkey their_funding_pubkey;
-	secp256k1_ecdsa_signature theirsig, sig;
+	struct bitcoin_signature theirsig, sig;
 	struct bitcoin_tx *local_commit, *remote_commit;
 	struct bitcoin_blkid chain_hash;
 	u8 *msg;
@@ -822,10 +824,11 @@ static u8 *fundee_channel(struct state *state, const u8 *open_channel_msg)
 	if (!msg)
 		return NULL;
 
+	theirsig.sighash_type = SIGHASH_ALL;
 	if (!fromwire_funding_created(msg, &id_in,
 				      &state->funding_txid,
 				      &state->funding_txout,
-				      &theirsig))
+				      &theirsig.s))
 		peer_failed(&state->cs,
 			    &state->channel_id,
 			    "Parsing funding_created");
@@ -879,7 +882,7 @@ static u8 *fundee_channel(struct state *state, const u8 *open_channel_msg)
 		peer_failed(&state->cs,
 			    &state->channel_id,
 			    "Bad signature %s on tx %s using key %s",
-			    type_to_string(tmpctx, secp256k1_ecdsa_signature,
+			    type_to_string(tmpctx, struct bitcoin_signature,
 					   &theirsig),
 			    type_to_string(tmpctx, struct bitcoin_tx, local_commit),
 			    type_to_string(tmpctx, struct pubkey,
@@ -928,7 +931,8 @@ static u8 *fundee_channel(struct state *state, const u8 *open_channel_msg)
 
 	/* We don't send this ourselves: channeld does, because master needs
 	 * to save state to disk before doing so. */
-	msg = towire_funding_signed(state, &state->channel_id, &sig);
+	assert(sig.sighash_type == SIGHASH_ALL);
+	msg = towire_funding_signed(state, &state->channel_id, &sig.s);
 
 	return towire_opening_fundee(state,
 				     &state->remoteconf,
@@ -1043,6 +1047,24 @@ static void fail_if_all_error(const u8 *inner)
 	exit(0);
 }
 
+#if DEVELOPER
+static void handle_dev_memleak(struct state *state, const u8 *msg)
+{
+	struct htable *memtable;
+	bool found_leak;
+
+	memtable = memleak_enter_allocations(tmpctx, msg, msg);
+
+	/* Now delete state and things it has pointers to. */
+	memleak_remove_referenced(memtable, state);
+
+	found_leak = dump_memleak(memtable);
+	wire_sync_write(REQ_FD,
+			take(towire_opening_dev_memleak_reply(NULL,
+							      found_leak)));
+}
+#endif /* DEVELOPER */
+
 static u8 *handle_master_in(struct state *state)
 {
 	u8 *msg = wire_sync_read(tmpctx, REQ_FD);
@@ -1076,6 +1098,12 @@ static u8 *handle_master_in(struct state *state)
 		state->can_accept_channel = true;
 		return NULL;
 
+	case WIRE_OPENING_DEV_MEMLEAK:
+#if DEVELOPER
+		handle_dev_memleak(state, msg);
+		return NULL;
+#endif
+	case WIRE_OPENING_DEV_MEMLEAK_REPLY:
 	case WIRE_OPENING_INIT:
 	case WIRE_OPENING_FUNDER_REPLY:
 	case WIRE_OPENING_FUNDEE:

@@ -15,9 +15,13 @@
 #include <common/dev_disconnect.h>
 #include <common/features.h>
 #include <common/initial_commit_tx.h>
+#include <common/json_command.h>
+#include <common/jsonrpc_errors.h>
 #include <common/key_derive.h>
+#include <common/param.h>
 #include <common/status.h>
 #include <common/timeout.h>
+#include <common/version.h>
 #include <common/wire_error.h>
 #include <connectd/gen_connect_wire.h>
 #include <errno.h>
@@ -32,12 +36,11 @@
 #include <lightningd/hsm_control.h>
 #include <lightningd/json.h>
 #include <lightningd/jsonrpc.h>
-#include <lightningd/jsonrpc_errors.h>
 #include <lightningd/log.h>
+#include <lightningd/memdump.h>
 #include <lightningd/onchain_control.h>
 #include <lightningd/opening_control.h>
 #include <lightningd/options.h>
-#include <lightningd/param.h>
 #include <lightningd/peer_htlcs.h>
 #include <unistd.h>
 #include <wally_bip32.h>
@@ -93,9 +96,7 @@ static void peer_update_features(struct peer *peer,
 
 struct peer *new_peer(struct lightningd *ld, u64 dbid,
 		      const struct pubkey *id,
-		      const struct wireaddr_internal *addr,
-		      const u8 *globalfeatures TAKES,
-		      const u8 *localfeatures TAKES)
+		      const struct wireaddr_internal *addr)
 {
 	/* We are owned by our channels, and freed manually by destroy_channel */
 	struct peer *peer = tal(NULL, struct peer);
@@ -104,15 +105,8 @@ struct peer *new_peer(struct lightningd *ld, u64 dbid,
 	peer->dbid = dbid;
 	peer->id = *id;
 	peer->uncommitted_channel = NULL;
-	/* FIXME: This is always set, right? */
-	if (addr)
-		peer->addr = *addr;
-	else {
-		peer->addr.itype = ADDR_INTERNAL_WIREADDR;
-		peer->addr.u.wireaddr.type = ADDR_TYPE_PADDING;
-	}
+	peer->addr = *addr;
 	peer->globalfeatures = peer->localfeatures = NULL;
-	peer_update_features(peer, globalfeatures, localfeatures);
 	list_head_init(&peer->channels);
 	peer->direction = get_channel_direction(&peer->ld->id, &peer->id);
 
@@ -194,7 +188,7 @@ u8 *p2wpkh_for_keyidx(const tal_t *ctx, struct lightningd *ld, u64 keyidx)
 static void sign_last_tx(struct channel *channel)
 {
 	struct lightningd *ld = channel->peer->ld;
-	secp256k1_ecdsa_signature sig;
+	struct bitcoin_signature sig;
 	u8 *msg;
 
 	assert(!channel->last_tx->input[0].witness);
@@ -440,10 +434,9 @@ void peer_connected(struct lightningd *ld, const u8 *msg,
 	 * subdaemon.  Otherwise, we'll hand to openingd to wait there. */
 	peer = peer_by_id(ld, &id);
 	if (!peer)
-		peer = new_peer(ld, 0, &id, &addr,
-				globalfeatures, localfeatures);
-	else
-		peer_update_features(peer, globalfeatures, localfeatures);
+		peer = new_peer(ld, 0, &id, &addr);
+
+	peer_update_features(peer, globalfeatures, localfeatures);
 
 	/* Can't be opening, since we wouldn't have sent peer_disconnected. */
 	assert(!peer->uncommitted_channel);
@@ -671,12 +664,10 @@ static void json_add_peer(struct lightningd *ld,
 	 * their features *last* time they connected. */
 	if (connected) {
 		json_array_start(response, "netaddr");
-		if (p->addr.itype != ADDR_INTERNAL_WIREADDR
-		    || p->addr.u.wireaddr.type != ADDR_TYPE_PADDING)
-			json_add_string(response, NULL,
-					type_to_string(response,
-						       struct wireaddr_internal,
-						       &p->addr));
+		json_add_string(response, NULL,
+				type_to_string(response,
+					       struct wireaddr_internal,
+					       &p->addr));
 		json_array_end(response);
 		if (deprecated_apis) {
 			json_add_hex_talarr(response, "global_features",
@@ -813,7 +804,9 @@ static void json_add_peer(struct lightningd *ld,
 }
 
 static void json_listpeers(struct command *cmd,
-			  const char *buffer, const jsmntok_t *params)
+			   const char *buffer,
+			   const jsmntok_t *obj UNNEEDED,
+			   const jsmntok_t *params)
 {
 	enum log_level *ll;
 	struct pubkey *specific_id;
@@ -900,7 +893,9 @@ command_find_channel(struct command *cmd,
 }
 
 static void json_close(struct command *cmd,
-		       const char *buffer, const jsmntok_t *params)
+		       const char *buffer,
+		       const jsmntok_t *obj UNNEEDED,
+		       const jsmntok_t *params)
 {
 	const jsmntok_t *idtok;
 	struct peer *peer;
@@ -946,9 +941,11 @@ static void json_close(struct command *cmd,
 	if (channel->state != CHANNELD_NORMAL &&
 	    channel->state != CHANNELD_AWAITING_LOCKIN &&
 	    channel->state != CHANNELD_SHUTTING_DOWN &&
-	    channel->state != CLOSINGD_SIGEXCHANGE)
+	    channel->state != CLOSINGD_SIGEXCHANGE) {
 		command_fail(cmd, LIGHTNINGD, "Channel is in state %s",
 			     channel_state_name(channel));
+		return;
+	}
 
 	/* If normal or locking in, transition to shutting down
 	 * state.
@@ -1040,14 +1037,18 @@ void load_channels_from_wallet(struct lightningd *ld)
 }
 
 static void json_disconnect(struct command *cmd,
-			 const char *buffer, const jsmntok_t *params)
+			    const char *buffer,
+			    const jsmntok_t *obj UNNEEDED,
+			    const jsmntok_t *params)
 {
 	struct pubkey *id;
 	struct peer *peer;
 	struct channel *channel;
+	bool *force;
 
 	if (!param(cmd, buffer, params,
 		   p_req("id", json_tok_pubkey, &id),
+		   p_opt_def("force", json_tok_bool, &force, false),
 		   NULL))
 		return;
 
@@ -1058,6 +1059,12 @@ static void json_disconnect(struct command *cmd,
 	}
 	channel = peer_active_channel(peer);
 	if (channel) {
+		if (*force) {
+			channel_fail_transient(channel,
+					       "disconnect command force=true");
+			command_success(cmd, null_response(cmd));
+			return;
+		}
 		command_fail(cmd, LIGHTNINGD, "Peer is in state %s",
 			     channel_state_name(channel));
 		return;
@@ -1074,13 +1081,89 @@ static void json_disconnect(struct command *cmd,
 static const struct json_command disconnect_command = {
 	"disconnect",
 	json_disconnect,
-	"Disconnect from {id} that has previously been connected to using connect"
+	"Disconnect from {id} that has previously been connected to using connect; with {force} set, even if it has a current channel"
 };
 AUTODATA(json_command, &disconnect_command);
 
+static void json_getinfo(struct command *cmd,
+			 const char *buffer,
+			 const jsmntok_t *obj UNNEEDED,
+			 const jsmntok_t *params)
+{
+    struct json_stream *response;
+    struct peer *peer;
+    struct channel *channel;
+    unsigned int pending_channels = 0, active_channels = 0,
+            inactive_channels = 0, num_peers = 0;
+
+    if (!param(cmd, buffer, params, NULL))
+        return;
+
+    response = json_stream_success(cmd);
+    json_object_start(response, NULL);
+    json_add_pubkey(response, "id", &cmd->ld->id);
+    json_add_string(response, "alias", (const char *)cmd->ld->alias);
+    json_add_hex_talarr(response, "color", cmd->ld->rgb);
+
+    /* Add some peer and channel stats */
+    list_for_each(&cmd->ld->peers, peer, list) {
+        num_peers++;
+        /* Count towards pending? */
+        if (peer->uncommitted_channel) {
+            pending_channels++;
+        }
+
+        list_for_each(&peer->channels, channel, list) {
+            if (channel->state == CHANNELD_AWAITING_LOCKIN) {
+                pending_channels++;
+            } else if (channel_active(channel)) {
+                active_channels++;
+            } else {
+                inactive_channels++;
+            }
+        }
+    }
+    json_add_num(response, "num_peers", num_peers);
+    json_add_num(response, "num_pending_channels", pending_channels);
+    json_add_num(response, "num_active_channels", active_channels);
+    json_add_num(response, "num_inactive_channels", inactive_channels);
+
+    /* Add network info */
+    if (cmd->ld->listen) {
+        /* These are the addresses we're announcing */
+        json_array_start(response, "address");
+        for (size_t i = 0; i < tal_count(cmd->ld->announcable); i++)
+            json_add_address(response, NULL, cmd->ld->announcable+i);
+        json_array_end(response);
+
+        /* This is what we're actually bound to. */
+        json_array_start(response, "binding");
+        for (size_t i = 0; i < tal_count(cmd->ld->binding); i++)
+            json_add_address_internal(response, NULL,
+                          cmd->ld->binding+i);
+        json_array_end(response);
+    }
+    json_add_string(response, "version", version());
+    json_add_num(response, "blockheight", get_block_height(cmd->ld->topology));
+    json_add_string(response, "network", get_chainparams(cmd->ld)->network_name);
+    json_add_u64(response, "msatoshi_fees_collected",
+             wallet_total_forward_fees(cmd->ld->wallet));
+    json_object_end(response);
+    command_success(cmd, response);
+}
+
+static const struct json_command getinfo_command = {
+    "getinfo",
+    json_getinfo,
+    "Show information about this node"
+};
+AUTODATA(json_command, &getinfo_command);
+
 #if DEVELOPER
 static void json_sign_last_tx(struct command *cmd,
-			      const char *buffer, const jsmntok_t *params)
+			      const char *buffer,
+			      const jsmntok_t *obj UNNEEDED,
+			      const jsmntok_t *params)
 {
 	struct pubkey *peerid;
 	struct peer *peer;
@@ -1127,7 +1210,9 @@ static const struct json_command dev_sign_last_tx = {
 AUTODATA(json_command, &dev_sign_last_tx);
 
 static void json_dev_fail(struct command *cmd,
-			  const char *buffer, const jsmntok_t *params)
+			  const char *buffer,
+			  const jsmntok_t *obj UNNEEDED,
+			  const jsmntok_t *params)
 {
 	struct pubkey *peerid;
 	struct peer *peer;
@@ -1172,7 +1257,9 @@ static void dev_reenable_commit_finished(struct subd *channeld UNUSED,
 }
 
 static void json_dev_reenable_commit(struct command *cmd,
-				     const char *buffer, const jsmntok_t *params)
+				     const char *buffer,
+				     const jsmntok_t *obj UNNEEDED,
+				     const jsmntok_t *params)
 {
 	struct pubkey *peerid;
 	struct peer *peer;
@@ -1261,7 +1348,9 @@ static void process_dev_forget_channel(struct bitcoind *bitcoind UNUSED,
 	command_success(forget->cmd, response);
 }
 
-static void json_dev_forget_channel(struct command *cmd, const char *buffer,
+static void json_dev_forget_channel(struct command *cmd,
+				    const char *buffer,
+				    const jsmntok_t *obj UNNEEDED,
 				    const jsmntok_t *params)
 {
 	struct pubkey *peerid;
@@ -1332,4 +1421,100 @@ static const struct json_command dev_forget_channel_command = {
 	"Forget the channel with peer {id}. Checks if the channel is still active by checking its funding transaction. Check can be ignored by setting {force} to 'true'"
 };
 AUTODATA(json_command, &dev_forget_channel_command);
+
+static void subd_died_forget_memleak(struct subd *openingd, struct command *cmd)
+{
+	/* FIXME: We ignore the remaining per-peer daemons in this case. */
+	peer_memleak_done(cmd, NULL);
+}
+
+/* Mutual recursion */
+static void peer_memleak_req_next(struct command *cmd, struct channel *prev);
+static void peer_memleak_req_done(struct subd *subd, bool found_leak,
+				  struct command *cmd)
+{
+	struct channel *c = subd->channel;
+
+	if (found_leak)
+		peer_memleak_done(cmd, subd);
+	else
+		peer_memleak_req_next(cmd, c);
+}
+
+static void channeld_memleak_req_done(struct subd *channeld,
+				      const u8 *msg, const int *fds UNUSED,
+				      struct command *cmd)
+{
+	bool found_leak;
+
+	tal_del_destructor2(channeld, subd_died_forget_memleak, cmd);
+	if (!fromwire_channel_dev_memleak_reply(msg, &found_leak)) {
+		command_fail(cmd, LIGHTNINGD, "Bad channel_dev_memleak");
+		return;
+	}
+	peer_memleak_req_done(channeld, found_leak, cmd);
+}
+
+static void onchaind_memleak_req_done(struct subd *onchaind,
+				      const u8 *msg, const int *fds UNUSED,
+				      struct command *cmd)
+{
+	bool found_leak;
+
+	tal_del_destructor2(onchaind, subd_died_forget_memleak, cmd);
+	if (!fromwire_onchain_dev_memleak_reply(msg, &found_leak)) {
+		command_fail(cmd, LIGHTNINGD, "Bad onchain_dev_memleak");
+		return;
+	}
+	peer_memleak_req_done(onchaind, found_leak, cmd);
+}
+
+static void peer_memleak_req_next(struct command *cmd, struct channel *prev)
+{
+	struct peer *p;
+
+	list_for_each(&cmd->ld->peers, p, list) {
+		struct channel *c;
+
+		list_for_each(&p->channels, c, list) {
+			if (c == prev) {
+				prev = NULL;
+				continue;
+			}
+
+			if (!c->owner)
+				continue;
+
+			if (prev != NULL)
+				continue;
+
+			/* Note: closingd does its own checking automatically */
+			if (streq(c->owner->name, "lightning_channeld")) {
+				subd_req(c, c->owner,
+					 take(towire_channel_dev_memleak(NULL)),
+					 -1, 0, channeld_memleak_req_done, cmd);
+				tal_add_destructor2(c->owner,
+						    subd_died_forget_memleak,
+						    cmd);
+				return;
+			}
+			if (streq(c->owner->name, "lightning_onchaind")) {
+				subd_req(c, c->owner,
+					 take(towire_onchain_dev_memleak(NULL)),
+					 -1, 0, onchaind_memleak_req_done, cmd);
+				tal_add_destructor2(c->owner,
+						    subd_died_forget_memleak,
+						    cmd);
+				return;
+			}
+		}
+	}
+	peer_memleak_done(cmd, NULL);
+}
+
+void peer_dev_memleak(struct command *cmd)
+{
+	peer_memleak_req_next(cmd, NULL);
+}
 #endif /* DEVELOPER */
+

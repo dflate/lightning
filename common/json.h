@@ -35,8 +35,8 @@ bool json_to_u64(const char *buffer, const jsmntok_t *tok,
 bool json_to_double(const char *buffer, const jsmntok_t *tok, double *num);
 
 /* Extract satoshis from this (may be a string, or a decimal number literal) */
-bool json_tok_bitcoin_amount(const char *buffer, const jsmntok_t *tok,
-			     uint64_t *satoshi);
+bool json_to_bitcoin_amount(const char *buffer, const jsmntok_t *tok,
+			    uint64_t *satoshi);
 
 /* Is this a number? [0..9]+ */
 bool json_tok_is_num(const char *buffer, const jsmntok_t *tok);
@@ -55,6 +55,22 @@ const jsmntok_t *json_get_member(const char *buffer, const jsmntok_t tok[],
 const jsmntok_t *json_get_arr(const jsmntok_t tok[], size_t index);
 
 /* If input is complete and valid, return tokens. */
-jsmntok_t *json_parse_input(const char *input, int len, bool *valid);
+jsmntok_t *json_parse_input(const tal_t *ctx,
+			    const char *input, int len, bool *valid);
+
+/* Convert a jsmntype_t enum to a human readable string. */
+const char *jsmntype_to_string(jsmntype_t t);
+
+/* Print a json value for debugging purposes. */
+void json_tok_print(const char *buffer, const jsmntok_t *params);
+
+/* Return a copy of a json value as an array. */
+jsmntok_t *json_tok_copy(const tal_t *ctx, const jsmntok_t *tok);
+
+/*
+ * Remove @num json values from a json array or object. @tok points
+ * to the first value to remove.  The array will be resized.
+ */
+void json_tok_remove(jsmntok_t **tokens, jsmntok_t *tok, size_t num);
 
 #endif /* LIGHTNING_COMMON_JSON_H */

@@ -7,6 +7,7 @@
 #include <ccan/time/time.h>
 #include <ccan/timer/timer.h>
 #include <lightningd/htlc_end.h>
+#include <lightningd/plugin.h>
 #include <stdio.h>
 #include <wallet/txfilter.h>
 #include <wallet/wallet.h>
@@ -83,10 +84,11 @@ struct lightningd {
 	/* Location of the RPC socket. */
 	char *rpc_filename;
 
-	/* The listener for the RPC socket. Can be shut down separately from the
-	 * rest of the daemon to allow a clean shutdown, which frees all pending
-	 * cmds in a DB transaction. */
-	struct io_listener *rpc_listener;
+	/* The root of the jsonrpc interface. Can be shut down
+	 * separately from the rest of the daemon to allow a clean
+	 * shutdown, which frees all pending cmds in a DB
+	 * transaction. */
+	struct jsonrpc *jsonrpc;
 
 	/* Configuration file name */
 	char *config_filename;
@@ -181,10 +183,10 @@ struct lightningd {
 	 * if we are the fundee. */
 	u32 max_funding_unconfirmed;
 
-#if DEVELOPER
-	/* If we want to debug a subdaemon. */
-	const char *dev_debug_subdaemon;
+	/* If we want to debug a subdaemon/plugin. */
+	const char *dev_debug_subprocess;
 
+#if DEVELOPER
 	/* If we have a --dev-disconnect file */
 	int dev_disconnect_fd;
 
@@ -203,6 +205,8 @@ struct lightningd {
 	bool use_proxy_always;
 	char *tor_service_password;
 	bool pure_tor_setup;
+
+	struct plugins *plugins;
 };
 
 const struct chainparams *get_chainparams(const struct lightningd *ld);

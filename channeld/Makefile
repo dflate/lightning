@@ -43,6 +43,7 @@ CHANNELD_COMMON_OBJS :=				\
 	common/daemon_conn.o			\
 	common/derive_basepoints.o		\
 	common/dev_disconnect.o			\
+	common/features.o			\
 	common/gen_status_wire.o		\
 	common/gen_peer_status_wire.o		\
 	common/htlc_state.o			\
@@ -71,7 +72,7 @@ CHANNELD_COMMON_OBJS :=				\
 	common/version.o			\
 	common/wire_error.o			\
 	common/wireaddr.o			\
-	gossipd/gen_gossip_wire.o		\
+	gossipd/gen_gossip_peerd_wire.o		\
 	hsmd/gen_hsm_wire.o			\
 	lightningd/gossip_msg.o			\
 	wire/fromwire.o				\

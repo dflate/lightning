@@ -30,6 +30,7 @@
 #include <common/funding_tx.h>
 #include <common/hash_u5.h>
 #include <common/key_derive.h>
+#include <common/memleak.h>
 #include <common/status.h>
 #include <common/subdaemon.h>
 #include <common/type_to_string.h>
@@ -101,7 +102,8 @@ static UINTMAP(struct client *) clients;
 static struct client *dbid_zero_clients[3];
 static size_t num_dbid_zero_clients;
 
-/*~ We need this deep inside bad_req_fmt, so we make it a global. */
+/*~ We need this deep inside bad_req_fmt, and for memleak, so we make it a
+ * global. */
 static struct daemon_conn *status_conn;
 
 /* This is used for various assertions and error cases. */
@@ -729,7 +731,7 @@ static struct io_plan *handle_sign_commitment_tx(struct io_conn *conn,
 	u64 dbid, funding_amount;
 	struct secret channel_seed;
 	struct bitcoin_tx *tx;
-	secp256k1_ecdsa_signature sig;
+	struct bitcoin_signature sig;
 	struct secrets secrets;
 	const u8 *funding_wscript;
 
@@ -760,6 +762,7 @@ static struct io_plan *handle_sign_commitment_tx(struct io_conn *conn,
 	sign_tx_input(tx, 0, NULL, funding_wscript,
 		      &secrets.funding_privkey,
 		      &local_funding_pubkey,
+		      SIGHASH_ALL,
 		      &sig);
 
 	return req_reply(conn, c,
@@ -782,7 +785,7 @@ static struct io_plan *handle_sign_remote_commitment_tx(struct io_conn *conn,
 	u64 funding_amount;
 	struct secret channel_seed;
 	struct bitcoin_tx *tx;
-	secp256k1_ecdsa_signature sig;
+	struct bitcoin_signature sig;
 	struct secrets secrets;
 	const u8 *funding_wscript;
 
@@ -804,6 +807,7 @@ static struct io_plan *handle_sign_remote_commitment_tx(struct io_conn *conn,
 	sign_tx_input(tx, 0, NULL, funding_wscript,
 		      &secrets.funding_privkey,
 		      &local_funding_pubkey,
+		      SIGHASH_ALL,
 		      &sig);
 
 	return req_reply(conn, c, take(towire_hsm_sign_tx_reply(NULL, &sig)));
@@ -817,7 +821,7 @@ static struct io_plan *handle_sign_remote_htlc_tx(struct io_conn *conn,
 {
 	struct secret channel_seed;
 	struct bitcoin_tx *tx;
-	secp256k1_ecdsa_signature sig;
+	struct bitcoin_signature sig;
 	struct secrets secrets;
 	struct basepoints basepoints;
 	struct pubkey remote_per_commit_point;
@@ -849,7 +853,8 @@ static struct io_plan *handle_sign_remote_htlc_tx(struct io_conn *conn,
 
 	/* Need input amount for signing */
 	tx->input[0].amount = tal_dup(tx->input, u64, &amount);
-	sign_tx_input(tx, 0, NULL, wscript, &htlc_privkey, &htlc_pubkey, &sig);
+	sign_tx_input(tx, 0, NULL, wscript, &htlc_privkey, &htlc_pubkey,
+		      SIGHASH_ALL, &sig);
 
 	return req_reply(conn, c, take(towire_hsm_sign_tx_reply(NULL, &sig)));
 }
@@ -865,7 +870,7 @@ static struct io_plan *handle_sign_to_us_tx(struct io_conn *conn,
 					    const u8 *wscript,
 					    u64 input_amount)
 {
-	secp256k1_ecdsa_signature sig;
+	struct bitcoin_signature sig;
 	struct pubkey pubkey;
 
 	if (!pubkey_from_privkey(privkey, &pubkey))
@@ -875,7 +880,7 @@ static struct io_plan *handle_sign_to_us_tx(struct io_conn *conn,
 		return bad_req_fmt(conn, c, msg_in, "bad txinput count");
 
 	tx->input[0].amount = tal_dup(tx->input, u64, &input_amount);
-	sign_tx_input(tx, 0, NULL, wscript, privkey, &pubkey, &sig);
+	sign_tx_input(tx, 0, NULL, wscript, privkey, &pubkey, SIGHASH_ALL, &sig);
 
 	return req_reply(conn, c, take(towire_hsm_sign_tx_reply(NULL, &sig)));
 }
@@ -1032,7 +1037,7 @@ static struct io_plan *handle_sign_local_htlc_tx(struct io_conn *conn,
 	struct pubkey per_commitment_point, htlc_basepoint;
 	struct bitcoin_tx *tx;
 	u8 *wscript;
-	secp256k1_ecdsa_signature sig;
+	struct bitcoin_signature sig;
 	struct privkey htlc_privkey;
 	struct pubkey htlc_pubkey;
 
@@ -1072,7 +1077,8 @@ static struct io_plan *handle_sign_local_htlc_tx(struct io_conn *conn,
 
 	/* FIXME: Check that output script is correct! */
 	tx->input[0].amount = tal_dup(tx->input, u64, &input_amount);
-	sign_tx_input(tx, 0, NULL, wscript, &htlc_privkey, &htlc_pubkey, &sig);
+	sign_tx_input(tx, 0, NULL, wscript, &htlc_privkey, &htlc_pubkey,
+		      SIGHASH_ALL, &sig);
 
 	return req_reply(conn, c, take(towire_hsm_sign_tx_reply(NULL, &sig)));
 }
@@ -1163,7 +1169,7 @@ static struct io_plan *handle_sign_mutual_close_tx(struct io_conn *conn,
 	struct secret channel_seed;
 	struct bitcoin_tx *tx;
 	struct pubkey remote_funding_pubkey, local_funding_pubkey;
-	secp256k1_ecdsa_signature sig;
+	struct bitcoin_signature sig;
 	struct secrets secrets;
 	u64 funding_amount;
 	const u8 *funding_wscript;
@@ -1189,7 +1195,7 @@ static struct io_plan *handle_sign_mutual_close_tx(struct io_conn *conn,
 	sign_tx_input(tx, 0, NULL, funding_wscript,
 		      &secrets.funding_privkey,
 		      &local_funding_pubkey,
-		      &sig);
+		      SIGHASH_ALL, &sig);
 
 	return req_reply(conn, c, take(towire_hsm_sign_tx_reply(NULL, &sig)));
 }
@@ -1304,10 +1310,6 @@ static void hsm_key_for_utxo(struct privkey *privkey, struct pubkey *pubkey,
 /* This completes the tx by filling in the input scripts with signatures. */
 static void sign_all_inputs(struct bitcoin_tx *tx, struct utxo **utxos)
 {
-	/* FIXME: sign_tx_input is dumb and needs all input->script to be
-	 * NULL, so we gather these here and assign them at the end */
-	u8 **scriptSigs = tal_arr(tmpctx, u8 *, tal_count(utxos));
-
 	/*~ Deep in my mind there's a continuous battle: should arrays be
 	 * named as singular or plural?  Is consistency the sign of a weak
 	 * mind?
@@ -1325,7 +1327,7 @@ static void sign_all_inputs(struct bitcoin_tx *tx, struct utxo **utxos)
 		struct privkey inprivkey;
 		const struct utxo *in = utxos[i];
 		u8 *subscript, *wscript;
-		secp256k1_ecdsa_signature sig;
+		struct bitcoin_signature sig;
 
 		/* Figure out keys to spend this. */
 		hsm_key_for_utxo(&inprivkey, &inkey, in);
@@ -1337,24 +1339,22 @@ static void sign_all_inputs(struct bitcoin_tx *tx, struct utxo **utxos)
 			/* For P2SH-wrapped Segwit, the (implied) redeemScript
 			 * is defined in BIP141 */
 			subscript = bitcoin_redeem_p2sh_p2wpkh(tmpctx, &inkey);
-			scriptSigs[i] = bitcoin_scriptsig_p2sh_p2wpkh(tx, &inkey);
+			tx->input[i].script
+				= bitcoin_scriptsig_p2sh_p2wpkh(tx->input,
+								&inkey);
 		} else {
 			/* Pure segwit uses an empty inputScript; NULL has
 			 * tal_count() == 0, so it works great here. */
 			subscript = NULL;
-			scriptSigs[i] = NULL;
+			tx->input[i].script = NULL;
 		}
 		/* This is the core crypto magic. */
 		sign_tx_input(tx, i, subscript, wscript, &inprivkey, &inkey,
-			      &sig);
+			      SIGHASH_ALL, &sig);
 
 		/* The witness is [sig] [key] */
 		tx->input[i].witness = bitcoin_witness_p2wpkh(tx, &sig, &inkey);
 	}
-
-	/* Now complete the transaction by attaching the scriptSigs */
-	for (size_t i = 0; i < tal_count(utxos); i++)
-		tx->input[i].script = scriptSigs[i];
 }
 
 /*~ lightningd asks us to sign the transaction to fund a channel; it feeds us
@@ -1537,6 +1537,30 @@ static struct io_plan *handle_sign_node_announcement(struct io_conn *conn,
 	return req_reply(conn, c, take(reply));
 }
 
+#if DEVELOPER
+static struct io_plan *handle_memleak(struct io_conn *conn,
+				      struct client *c,
+				      const u8 *msg_in)
+{
+	struct htable *memtable;
+	bool found_leak;
+	u8 *reply;
+
+	memtable = memleak_enter_allocations(tmpctx, msg_in, msg_in);
+
+	/* Now delete clients and anything they point to. */
+	memleak_remove_referenced(memtable, c);
+	memleak_scan_region(memtable,
+			    dbid_zero_clients, sizeof(dbid_zero_clients));
+	memleak_remove_uintmap(memtable, &clients);
+	memleak_scan_region(memtable, status_conn, tal_bytelen(status_conn));
+
+	found_leak = dump_memleak(memtable);
+	reply = towire_hsm_dev_memleak_reply(NULL, found_leak);
+	return req_reply(conn, c, take(reply));
+}
+#endif /* DEVELOPER */
+
 /*~ This routine checks that a client is allowed to call the handler. */
 static bool check_client_capabilities(struct client *client,
 				      enum hsm_wire_type t)
@@ -1588,6 +1612,7 @@ static bool check_client_capabilities(struct client *client,
 	case WIRE_HSM_SIGN_INVOICE:
 	case WIRE_HSM_SIGN_COMMITMENT_TX:
 	case WIRE_HSM_GET_CHANNEL_BASEPOINTS:
+	case WIRE_HSM_DEV_MEMLEAK:
 		return (client->capabilities & HSM_CAP_MASTER) != 0;
 
 	/*~ These are messages sent by the HSM so we should never receive them.
@@ -1608,6 +1633,7 @@ static bool check_client_capabilities(struct client *client,
 	case WIRE_HSM_GET_PER_COMMITMENT_POINT_REPLY:
 	case WIRE_HSM_CHECK_FUTURE_SECRET_REPLY:
 	case WIRE_HSM_GET_CHANNEL_BASEPOINTS_REPLY:
+	case WIRE_HSM_DEV_MEMLEAK_REPLY:
 		break;
 	}
 	return false;
@@ -1688,6 +1714,12 @@ static struct io_plan *handle_client(struct io_conn *conn, struct client *c)
 	case WIRE_HSM_SIGN_MUTUAL_CLOSE_TX:
 		return handle_sign_mutual_close_tx(conn, c, c->msg_in);
 
+#if DEVELOPER
+	case WIRE_HSM_DEV_MEMLEAK:
+		return handle_memleak(conn, c, c->msg_in);
+#else
+	case WIRE_HSM_DEV_MEMLEAK:
+#endif /* DEVELOPER */
 	case WIRE_HSM_ECDH_RESP:
 	case WIRE_HSM_CANNOUNCEMENT_SIG_REPLY:
 	case WIRE_HSM_CUPDATE_SIG_REPLY:
@@ -1703,6 +1735,7 @@ static struct io_plan *handle_client(struct io_conn *conn, struct client *c)
 	case WIRE_HSM_GET_PER_COMMITMENT_POINT_REPLY:
 	case WIRE_HSM_CHECK_FUTURE_SECRET_REPLY:
 	case WIRE_HSM_GET_CHANNEL_BASEPOINTS_REPLY:
+	case WIRE_HSM_DEV_MEMLEAK_REPLY:
 		break;
 	}
 
@@ -1726,9 +1759,7 @@ int main(int argc, char *argv[])
 	subdaemon_setup(argc, argv);
 
 	/* A trivial daemon_conn just for writing. */
-	status_conn = tal(NULL, struct daemon_conn);
-	daemon_conn_init(status_conn, status_conn, STDIN_FILENO,
-			 (void *)io_never, NULL);
+	status_conn = daemon_conn_new(NULL, STDIN_FILENO, NULL, NULL, NULL);
 	status_setup_async(status_conn);
 	uintmap_init(&clients);
 

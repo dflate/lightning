@@ -82,8 +82,8 @@ bool json_to_number(const char *buffer, const jsmntok_t *tok,
 	return true;
 }
 
-bool json_tok_bitcoin_amount(const char *buffer, const jsmntok_t *tok,
-			     uint64_t *satoshi)
+bool json_to_bitcoin_amount(const char *buffer, const jsmntok_t *tok,
+			    uint64_t *satoshi)
 {
 	char *end;
 	unsigned long btc, sat;
@@ -172,13 +172,14 @@ const jsmntok_t *json_get_arr(const jsmntok_t tok[], size_t index)
 	return NULL;
 }
 
-jsmntok_t *json_parse_input(const char *input, int len, bool *valid)
+jsmntok_t *json_parse_input(const tal_t *ctx,
+			    const char *input, int len, bool *valid)
 {
 	jsmn_parser parser;
 	jsmntok_t *toks;
 	int ret;
 
-	toks = tal_arr(input, jsmntok_t, 10);
+	toks = tal_arr(ctx, jsmntok_t, 10);
 	toks[0].type = JSMN_UNDEFINED;
 
 	jsmn_init(&parser);
@@ -215,4 +216,60 @@ again:
 	toks[ret].start = toks[ret].end = toks[ret].size = 0;
 
 	return toks;
+}
+
+const char *jsmntype_to_string(jsmntype_t t)
+{
+	switch (t) {
+		case JSMN_UNDEFINED :
+			return "UNDEFINED";
+		case JSMN_OBJECT :
+			return "OBJECT";
+		case JSMN_ARRAY :
+			return "ARRAY";
+		case JSMN_STRING :
+			return "STRING";
+		case JSMN_PRIMITIVE :
+			return "PRIMITIVE";
+	}
+	return "INVALID";
+}
+
+void json_tok_print(const char *buffer, const jsmntok_t *tok)
+{
+	const jsmntok_t *first = tok;
+	const jsmntok_t *last = json_next(tok);
+	printf("size: %d, count: %td\n", tok->size, last - first);
+	while (first != last) {
+		printf("%td. %.*s, %s\n", first - tok,
+		        first->end - first->start, buffer + first->start,
+			jsmntype_to_string(first->type));
+		first++;
+	}
+	printf("\n");
+}
+
+jsmntok_t *json_tok_copy(const tal_t *ctx, const jsmntok_t *tok)
+{
+	return tal_dup_arr(ctx, jsmntok_t, tok, json_next(tok) - tok, 0);
+}
+
+void json_tok_remove(jsmntok_t **tokens, jsmntok_t *tok, size_t num)
+{
+	assert(*tokens);
+	assert((*tokens)->type == JSMN_ARRAY || (*tokens)->type == JSMN_OBJECT);
+	const jsmntok_t *src = tok;
+	const jsmntok_t *end = json_next(*tokens);
+	jsmntok_t *dest = tok;
+	int remove_count;
+
+	for (int i = 0; i < num; i++)
+		src = json_next(src);
+
+	remove_count = src - tok;
+
+	memmove(dest, src, sizeof(jsmntok_t) * (end - src));
+
+	tal_resize(tokens, tal_count(*tokens) - remove_count);
+	(*tokens)->size -= num;
 }

@@ -55,6 +55,7 @@ CLOSINGD_COMMON_OBJS :=				\
 	common/gen_peer_status_wire.o		\
 	common/gen_status_wire.o		\
 	common/htlc_wire.o			\
+	common/key_derive.o			\
 	common/memleak.o			\
 	common/msg_queue.o			\
 	common/peer_billboard.o			\
@@ -71,9 +72,8 @@ CLOSINGD_COMMON_OBJS :=				\
 	common/version.o			\
 	common/wire_error.o			\
 	common/wireaddr.o			\
-	gossipd/gen_gossip_wire.o		\
-	hsmd/gen_hsm_wire.o			\
-	lightningd/gossip_msg.o
+	gossipd/gen_gossip_peerd_wire.o		\
+	hsmd/gen_hsm_wire.o
 
 closingd/gen_closing_wire.h: $(WIRE_GEN) closingd/closing_wire.csv
 	$(WIRE_GEN) --header $@ closing_wire_type < closingd/closing_wire.csv > $@

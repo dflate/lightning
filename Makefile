@@ -9,7 +9,7 @@ CCANDIR := ccan
 
 # Where we keep the BOLT RFCs
 BOLTDIR := ../lightning-rfc/
-BOLTVERSION := b6ae60d24138a3601561fbc1c9d82d983595ae4f
+BOLTVERSION := bca814e270dcbee2fea51c0a26ca99efef261f2b
 
 -include config.vars
 
@@ -38,7 +38,9 @@ ifeq ($(COMPAT),1)
 COMPAT_CFLAGS=-DCOMPAT_V052=1 -DCOMPAT_V060=1 -DCOMPAT_V061=1
 endif
 
-PYTEST_OPTS := -v
+# Timeout shortly before the 600 second travis silence timeout
+# (method=thread to support xdist)
+PYTEST_OPTS := -v --timeout=550 --timeout_method=thread
 
 # This is where we add new features as bitcoin adds them.
 FEATURES :=
@@ -46,6 +48,7 @@ FEATURES :=
 CCAN_OBJS :=					\
 	ccan-asort.o				\
 	ccan-autodata.o				\
+	ccan-bitmap.o				\
 	ccan-bitops.o				\
 	ccan-breakpoint.o			\
 	ccan-crc.o				\
@@ -97,6 +100,7 @@ CCAN_HEADERS :=						\
 	$(CCANDIR)/ccan/array_size/array_size.h		\
 	$(CCANDIR)/ccan/asort/asort.h			\
 	$(CCANDIR)/ccan/autodata/autodata.h		\
+	$(CCANDIR)/ccan/bitmap/bitmap.h			\
 	$(CCANDIR)/ccan/bitops/bitops.h			\
 	$(CCANDIR)/ccan/breakpoint/breakpoint.h		\
 	$(CCANDIR)/ccan/build_assert/build_assert.h	\
@@ -180,7 +184,7 @@ LDLIBS = -L/usr/local/lib -lm -lgmp -lsqlite3 -lz $(COVFLAGS)
 
 default: all-programs all-test-programs
 
-config.vars ccan/config.h: configure
+config.vars ccan/config.h: configure ccan/tools/configurator/configurator.c
 	@if [ ! -f config.vars ]; then echo 'The 1990s are calling: use ./configure!' >&2; exit 1; fi
 	./configure --reconfigure
 
@@ -274,7 +278,8 @@ PYSRC=$(shell git ls-files "*.py") contrib/pylightning/lightning-pay
 check-python:
 	@# E501 line too long (N > 79 characters)
 	@# E731 do not assign a lambda expression, use a def
-	@flake8 --ignore=E501,E731 --exclude=contrib/pylightning/lightning/__init__.py ${PYSRC}
+	@# W503: line break before binary operator
+	@flake8 --ignore=E501,E731,W503 --exclude=contrib/pylightning/lightning/__init__.py ${PYSRC}
 
 check-includes:
 	@tools/check-includes.sh
@@ -396,6 +401,7 @@ exec_prefix = $(prefix)
 bindir = $(exec_prefix)/bin
 libexecdir = $(exec_prefix)/libexec
 pkglibexecdir = $(libexecdir)/$(PKGNAME)
+plugindir = $(pkglibexecdir)/plugins
 datadir = $(prefix)/share
 docdir = $(datadir)/doc/$(PKGNAME)
 mandir = $(datadir)/man
@@ -422,6 +428,7 @@ installdirs:
 	@$(NORMAL_INSTALL)
 	$(MKDIR_P) $(DESTDIR)$(bindir)
 	$(MKDIR_P) $(DESTDIR)$(pkglibexecdir)
+	$(MKDIR_P) $(DESTDIR)$(plugindir)
 	$(MKDIR_P) $(DESTDIR)$(man1dir)
 	$(MKDIR_P) $(DESTDIR)$(man5dir)
 	$(MKDIR_P) $(DESTDIR)$(man7dir)
@@ -441,11 +448,13 @@ PKGLIBEXEC_PROGRAMS = \
 	       lightningd/lightning_hsmd \
 	       lightningd/lightning_onchaind \
 	       lightningd/lightning_openingd
+PLUGINS=
 
 install-program: installdirs $(BIN_PROGRAMS) $(PKGLIBEXEC_PROGRAMS)
 	@$(NORMAL_INSTALL)
 	$(INSTALL_PROGRAM) $(BIN_PROGRAMS) $(DESTDIR)$(bindir)
 	$(INSTALL_PROGRAM) $(PKGLIBEXEC_PROGRAMS) $(DESTDIR)$(pkglibexecdir)
+	[ -z "$(PLUGINS)" ] || $(INSTALL_PROGRAM) $(PLUGINS) $(DESTDIR)$(plugindir)
 
 MAN1PAGES = $(filter %.1,$(MANPAGES))
 MAN5PAGES = $(filter %.5,$(MANPAGES))
@@ -466,6 +475,10 @@ uninstall:
 	@for f in $(BIN_PROGRAMS); do \
 	  echo rm -f $(DESTDIR)$(bindir)/`basename $$f`; \
 	  rm -f $(DESTDIR)$(bindir)/`basename $$f`; \
+	done
+	@for f in $(PLUGINS); do \
+	  echo rm -f $(DESTDIR)$(plugindir)/`basename $$f`; \
+	  rm -f $(DESTDIR)$(plugindir)/`basename $$f`; \
 	done
 	@for f in $(PKGLIBEXEC_PROGRAMS); do \
 	  echo rm -f $(DESTDIR)$(pkglibexecdir)/`basename $$f`; \
@@ -602,6 +615,8 @@ ccan-rbuf.o: $(CCANDIR)/ccan/rbuf/rbuf.c
 ccan-str-base32.o: $(CCANDIR)/ccan/str/base32/base32.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 ccan-utf8.o: $(CCANDIR)/ccan/utf8/utf8.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+ccan-bitmap.o: $(CCANDIR)/ccan/bitmap/bitmap.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 ccan-membuf.o: $(CCANDIR)/ccan/membuf/membuf.c
 	$(CC) $(CFLAGS) -c -o $@ $<

@@ -13,6 +13,7 @@
 
 #define io_write_ simple_write
 #define io_read_ simple_read
+#define io_close simple_close
 
 static struct io_plan *simple_write(struct io_conn *conn,
 				    const void *data, size_t len,
@@ -23,6 +24,11 @@ static struct io_plan *simple_read(struct io_conn *conn,
 				   void *data, size_t len,
 				   struct io_plan *(*next)(struct io_conn *, void *),
 				   void *next_arg);
+
+static struct io_plan *simple_close(struct io_conn *conn)
+{
+	return NULL;
+}
 
 #include "../connectd/handshake.c"
 
@@ -207,8 +213,6 @@ int main(int argc, char *argv[])
 		case ADDR_TYPE_IPV6:
 			af = AF_INET6;
 			break;
-		case ADDR_TYPE_PADDING:
-			abort();
 		}
 		ai = wireaddr_to_addrinfo(tmpctx, &addr.u.wireaddr);
 	}

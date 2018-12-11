@@ -1,11 +1,9 @@
 #include <ccan/asort/asort.h>
 #include <ccan/tal/str/str.h>
+#include <common/json_command.h>
+#include <common/jsonrpc_errors.h>
+#include <common/param.h>
 #include <common/utils.h>
-#include <lightningd/json.h>
-#include <lightningd/jsonrpc.h>
-#include <lightningd/jsonrpc_errors.h>
-#include <lightningd/lightningd.h>
-#include <lightningd/param.h>
 
 struct param {
 	const char *name;
@@ -63,7 +61,8 @@ static bool post_check(struct command *cmd, struct param *params)
 static bool parse_by_position(struct command *cmd,
 			      struct param *params,
 			      const char *buffer,
-			      const jsmntok_t tokens[])
+			      const jsmntok_t tokens[],
+			      bool allow_extra)
 {
 	const jsmntok_t *tok = tokens + 1;
 	const jsmntok_t *end = json_next(tokens);
@@ -79,7 +78,7 @@ static bool parse_by_position(struct command *cmd,
 	}
 
 	/* check for unexpected trailing params */
-	if (tok != end) {
+	if (!allow_extra && tok != end) {
 		command_fail(cmd, JSONRPC2_INVALID_PARAMS,
 			     "too many parameters:"
 			     " got %u, expected %zu",
@@ -108,7 +107,8 @@ static struct param *find_param(struct param *params, const char *start,
 static bool parse_by_name(struct command *cmd,
 			  struct param *params,
 			  const char *buffer,
-			  const jsmntok_t tokens[])
+			  const jsmntok_t tokens[],
+			  bool allow_extra)
 {
 	const jsmntok_t *first = tokens + 1;
 	const jsmntok_t *last = json_next(tokens);
@@ -117,21 +117,23 @@ static bool parse_by_name(struct command *cmd,
 		struct param *p = find_param(params, buffer + first->start,
 					     first->end - first->start);
 		if (!p) {
-			command_fail(cmd, JSONRPC2_INVALID_PARAMS,
-				     "unknown parameter: '%.*s'",
-				     first->end - first->start,
-				     buffer + first->start);
-			return false;
-		}
+			if (!allow_extra) {
+				command_fail(cmd, JSONRPC2_INVALID_PARAMS,
+					     "unknown parameter: '%.*s'",
+					     first->end - first->start,
+					     buffer + first->start);
+				return false;
+			}
+		} else {
+			if (p->is_set) {
+				command_fail(cmd, JSONRPC2_INVALID_PARAMS,
+					     "duplicate json names: '%s'", p->name);
+				return false;
+			}
 
-		if (p->is_set) {
-			command_fail(cmd, JSONRPC2_INVALID_PARAMS,
-				     "duplicate json names: '%s'", p->name);
-			return false;
+			if (!make_callback(cmd, p, buffer, first + 1))
+				return false;
 		}
-
-		if (!make_callback(cmd, p, buffer, first + 1))
-			return false;
 		first = json_next(first + 1);
 	}
 	return post_check(cmd, params);
@@ -237,7 +239,8 @@ static char *param_usage(const tal_t *ctx,
 
 static bool param_arr(struct command *cmd, const char *buffer,
 		      const jsmntok_t tokens[],
-		      struct param *params)
+		      struct param *params,
+		      bool allow_extra)
 {
 #if DEVELOPER
 	if (!check_params(params)) {
@@ -246,9 +249,9 @@ static bool param_arr(struct command *cmd, const char *buffer,
 	}
 #endif
 	if (tokens->type == JSMN_ARRAY)
-		return parse_by_position(cmd, params, buffer, tokens);
+		return parse_by_position(cmd, params, buffer, tokens, allow_extra);
 	else if (tokens->type == JSMN_OBJECT)
-		return parse_by_name(cmd, params, buffer, tokens);
+		return parse_by_name(cmd, params, buffer, tokens, allow_extra);
 
 	command_fail(cmd, JSONRPC2_INVALID_PARAMS,
 		     "Expected array or object for params");
@@ -261,12 +264,17 @@ bool param(struct command *cmd, const char *buffer,
 	struct param *params = tal_arr(cmd, struct param, 0);
 	const char *name;
 	va_list ap;
+	bool allow_extra = false;
 
 	va_start(ap, tokens);
 	while ((name = va_arg(ap, const char *)) != NULL) {
 		bool required = va_arg(ap, int);
 		param_cbx cbx = va_arg(ap, param_cbx);
 		void *arg = va_arg(ap, void *);
+		if (streq(name, "")) {
+			allow_extra = true;
+			continue;
+		}
 		if  (!param_add(&params, name, required, cbx, arg)) {
 			command_fail(cmd, PARAM_DEV_ERROR,
 				     "developer error: param_add %s", name);
@@ -276,10 +284,13 @@ bool param(struct command *cmd, const char *buffer,
 	}
 	va_end(ap);
 
-	if (cmd->mode == CMD_USAGE) {
-		cmd->usage = param_usage(cmd, params);
+	if (command_usage_only(cmd)) {
+		command_set_usage(cmd, param_usage(cmd, params));
 		return false;
 	}
 
-	return param_arr(cmd, buffer, tokens, params);
+	/* Always return false if we're simply checking command parameters;
+	 * normally this returns true if all parameters are valid. */
+	return param_arr(cmd, buffer, tokens, params, allow_extra)
+		&& !command_check_only(cmd);
 }

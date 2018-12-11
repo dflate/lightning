@@ -8,6 +8,7 @@
 #include <common/initial_commit_tx.h>
 #include <common/key_derive.h>
 #include <common/keyset.h>
+#include <common/memleak.h>
 #include <common/peer_billboard.h>
 #include <common/status.h>
 #include <common/subdaemon.h>
@@ -91,12 +92,12 @@ struct tracked_output {
 	u64 satoshi;
 	enum output_type output_type;
 
-	/* If it is an HTLC, these are non-NULL */
-	const struct htlc_stub *htlc;
+	/* If it is an HTLC, this is set, wscript is non-NULL. */
+	struct htlc_stub htlc;
 	const u8 *wscript;
 
 	/* If it's an HTLC off our unilateral, this is their sig for htlc_tx */
-	const secp256k1_ecdsa_signature *remote_htlc_sig;
+	const struct bitcoin_signature *remote_htlc_sig;
 
 	/* Our proposed solution (if any) */
 	struct proposed_resolution *proposal;
@@ -107,7 +108,7 @@ struct tracked_output {
 
 /* We vary feerate until signature they offered matches. */
 static u64 grind_htlc_tx_fee(struct bitcoin_tx *tx,
-			     const secp256k1_ecdsa_signature *remotesig,
+			     const struct bitcoin_signature *remotesig,
 			     const u8 *wscript,
 			     u64 multiplier)
 {
@@ -148,7 +149,7 @@ static u64 grind_htlc_tx_fee(struct bitcoin_tx *tx,
 }
 
 static bool set_htlc_timeout_fee(struct bitcoin_tx *tx,
-				 const secp256k1_ecdsa_signature *remotesig,
+				 const struct bitcoin_signature *remotesig,
 				 const u8 *wscript)
 {
 	static u64 fee = UINT64_MAX;
@@ -171,7 +172,7 @@ static bool set_htlc_timeout_fee(struct bitcoin_tx *tx,
 }
 
 static void set_htlc_success_fee(struct bitcoin_tx *tx,
-				 const secp256k1_ecdsa_signature *remotesig,
+				 const struct bitcoin_signature *remotesig,
 				 const u8 *wscript)
 {
 	static u64 fee = UINT64_MAX;
@@ -198,7 +199,7 @@ static void set_htlc_success_fee(struct bitcoin_tx *tx,
 		      " for tx %s, signature %s, wscript %s",
 		      fee,
 		      type_to_string(tmpctx, struct bitcoin_tx, tx),
-		      type_to_string(tmpctx, secp256k1_ecdsa_signature, remotesig),
+		      type_to_string(tmpctx, struct bitcoin_signature, remotesig),
 		      tal_hex(tmpctx, wscript));
 }
 
@@ -272,7 +273,7 @@ static struct bitcoin_tx *tx_to_us(const tal_t *ctx,
 {
 	struct bitcoin_tx *tx;
 	u64 fee;
-	secp256k1_ecdsa_signature sig;
+	struct bitcoin_signature sig;
 	u8 *msg;
 
 	tx = bitcoin_tx(ctx, 1, 1);
@@ -335,7 +336,7 @@ static struct bitcoin_tx *tx_to_us(const tal_t *ctx,
 
 static void hsm_sign_local_htlc_tx(struct bitcoin_tx *tx,
 				   const u8 *wscript,
-				   secp256k1_ecdsa_signature *sig)
+				   struct bitcoin_signature *sig)
 {
 	u8 *msg = towire_hsm_sign_local_htlc_tx(NULL, commit_num,
 					  tx, wscript,
@@ -397,9 +398,17 @@ static struct tracked_output *
 	out->output_type = output_type;
 	out->proposal = NULL;
 	out->resolved = NULL;
-	out->htlc = htlc;
-	out->wscript = wscript;
-	out->remote_htlc_sig = remote_htlc_sig;
+	if (htlc)
+		out->htlc = *htlc;
+	out->wscript = tal_steal(out, wscript);
+	if (remote_htlc_sig) {
+		struct bitcoin_signature *sig;
+		sig = tal(out, struct bitcoin_signature);
+		sig->s = *remote_htlc_sig;
+		sig->sighash_type = SIGHASH_ALL;
+		out->remote_htlc_sig = sig;
+	} else
+		out->remote_htlc_sig = NULL;
 
 	*tal_arr_expand(outs) = out;
 
@@ -485,14 +494,8 @@ static void propose_resolution_at_block(struct tracked_output *out,
 
 static bool is_valid_sig(const u8 *e)
 {
-	secp256k1_ecdsa_signature sig;
-	size_t len = tal_count(e);
-
-	/* Last byte is sighash flags */
-	if (len < 1)
-		return false;
-
-	return signature_from_der(e, len-1, &sig);
+	struct bitcoin_signature sig;
+	return signature_from_der(e, tal_count(e), &sig);
 }
 
 /* We ignore things which look like signatures. */
@@ -811,14 +814,14 @@ static void handle_htlc_onchain_fulfill(struct tracked_output *out,
 	sha256(&sha, &preimage, sizeof(preimage));
 	ripemd160(&ripemd, &sha, sizeof(sha));
 
-	if (!ripemd160_eq(&ripemd, &out->htlc->ripemd))
+	if (!ripemd160_eq(&ripemd, &out->htlc.ripemd))
 		status_failed(STATUS_FAIL_INTERNAL_ERROR,
 			      "%s/%s spent with bad preimage %s (ripemd not %s)",
 			      tx_type_name(out->tx_type),
 			      output_type_name(out->output_type),
 			      type_to_string(tmpctx, struct preimage, &preimage),
 			      type_to_string(tmpctx, struct ripemd160,
-					     &out->htlc->ripemd));
+					     &out->htlc.ripemd));
 
 	/* Tell master we found a preimage. */
 	status_trace("%s/%s gave us preimage %s",
@@ -1035,7 +1038,7 @@ static void update_resolution_depth(struct tracked_output *out, u32 depth)
 			     tx_type_name(out->tx_type),
 			     output_type_name(out->output_type),
 			     depth);
-		msg = towire_onchain_htlc_timeout(out, out->htlc);
+		msg = towire_onchain_htlc_timeout(out, &out->htlc);
 		wire_sync_write(REQ_FD, take(msg));
 	}
 	out->resolved->depth = depth;
@@ -1118,12 +1121,12 @@ static void handle_preimage(struct tracked_output **outs,
 
 	for (i = 0; i < tal_count(outs); i++) {
 		struct bitcoin_tx *tx;
-		secp256k1_ecdsa_signature sig;
+		struct bitcoin_signature sig;
 
 		if (outs[i]->output_type != THEIR_HTLC)
 			continue;
 
-		if (!ripemd160_eq(&outs[i]->htlc->ripemd, &ripemd))
+		if (!ripemd160_eq(&outs[i]->htlc.ripemd, &ripemd))
 			continue;
 
 		/* Too late? */
@@ -1194,6 +1197,55 @@ static void handle_preimage(struct tracked_output **outs,
 	}
 }
 
+#if DEVELOPER
+static void memleak_remove_globals(struct htable *memtable, const tal_t *topctx)
+{
+	/* memleak_scan_region is overkill if these are simple pointers to
+	 * objects which don't contain pointers, but it works. */
+	if (keyset)
+		memleak_scan_region(memtable, keyset, sizeof(*keyset));
+
+	if (remote_per_commitment_point)
+		memleak_scan_region(memtable, remote_per_commitment_point,
+				    sizeof(*remote_per_commitment_point));
+
+	if (remote_per_commitment_secret)
+		memleak_scan_region(memtable, remote_per_commitment_secret,
+				    sizeof(*remote_per_commitment_secret));
+
+	/* top-level context args */
+	memleak_scan_region(memtable, topctx, 0);
+
+	memleak_scan_region(memtable, missing_htlc_msgs,
+			    tal_bytelen(missing_htlc_msgs));
+}
+
+static bool handle_dev_memleak(struct tracked_output **outs, const u8 *msg)
+{
+	struct htable *memtable;
+	bool found_leak;
+
+	if (!fromwire_onchain_dev_memleak(msg))
+		return false;
+
+	memtable = memleak_enter_allocations(tmpctx, msg, msg);
+	/* Top-level context is parent of outs */
+	memleak_remove_globals(memtable, tal_parent(outs));
+	memleak_remove_referenced(memtable, outs);
+
+	found_leak = dump_memleak(memtable);
+	wire_sync_write(REQ_FD,
+			take(towire_onchain_dev_memleak_reply(NULL,
+							      found_leak)));
+	return true;
+}
+#else
+static bool handle_dev_memleak(struct tracked_output **outs, const u8 *msg)
+{
+	return false;
+}
+#endif /* !DEVELOPER */
+
 /* BOLT #5:
  *
  * A node:
@@ -1224,7 +1276,7 @@ static void wait_for_resolved(struct tracked_output **outs)
 			output_spent(&outs, tx, input_num, tx_blockheight);
 		else if (fromwire_onchain_known_preimage(msg, &preimage))
 			handle_preimage(outs, &preimage);
-		else
+		else if (!handle_dev_memleak(outs, msg))
 			master_badmsg(-1, msg);
 
 		billboard_update(outs);
@@ -1293,8 +1345,8 @@ static size_t resolve_our_htlc_ourcommit(struct tracked_output *out,
 					 const struct htlc_stub *htlcs,
 					 u8 **htlc_scripts)
 {
-	struct bitcoin_tx *tx;
-	secp256k1_ecdsa_signature localsig;
+	struct bitcoin_tx *tx = NULL;
+	struct bitcoin_signature localsig;
 	size_t i;
 
 	assert(tal_count(matches));
@@ -1345,7 +1397,7 @@ static size_t resolve_our_htlc_ourcommit(struct tracked_output *out,
 			      min_possible_feerate, max_possible_feerate,
 			      type_to_string(tmpctx, struct bitcoin_tx, tx),
 			      out->satoshi,
-			      type_to_string(tmpctx, secp256k1_ecdsa_signature,
+			      type_to_string(tmpctx, struct bitcoin_signature,
 					     out->remote_htlc_sig),
 			      cltvs, wscripts);
 	}
@@ -1715,8 +1767,8 @@ static void handle_our_unilateral(const struct bitcoin_tx *tx,
 			which_htlc = resolve_their_htlc(out, matches, htlcs,
 							htlc_scripts);
 		}
-		out->htlc = &htlcs[which_htlc];
-		out->wscript = htlc_scripts[which_htlc];
+		out->htlc = htlcs[which_htlc];
+		out->wscript = tal_steal(out, htlc_scripts[which_htlc]);
 
 		/* Each of these consumes one HTLC signature */
 		remote_htlc_sigs++;
@@ -2217,8 +2269,8 @@ static void handle_their_unilateral(const struct bitcoin_tx *tx,
 			which_htlc = resolve_their_htlc(out, matches, htlcs,
 							htlc_scripts);
 		}
-		out->htlc = &htlcs[which_htlc];
-		out->wscript = htlc_scripts[which_htlc];
+		out->htlc = htlcs[which_htlc];
+		out->wscript = tal_steal(out, htlc_scripts[which_htlc]);
 		htlc_scripts[which_htlc] = NULL;
 	}
 
@@ -2342,7 +2394,7 @@ int main(int argc, char *argv[])
 	missing_htlc_msgs = tal_arr(ctx, u8 *, 0);
 
 	msg = wire_sync_read(tmpctx, REQ_FD);
-	if (!fromwire_onchain_init(ctx, msg,
+	if (!fromwire_onchain_init(tmpctx, msg,
 				   &shachain,
 				   &funding_amount_satoshi,
 				   &old_remote_per_commit_point,
@@ -2370,11 +2422,13 @@ int main(int argc, char *argv[])
 	}
 
 	bitcoin_txid(tx, &txid);
+	/* We need to keep tx around, but there's only one: not really a leak */
+	tal_steal(ctx, notleak(tx));
 
 	/* FIXME: Filter as we go, don't load them all into mem! */
-	htlcs = tal_arr(ctx, struct htlc_stub, num_htlcs);
-	tell_if_missing = tal_arr(ctx, bool, num_htlcs);
-	tell_immediately = tal_arr(ctx, bool, num_htlcs);
+	htlcs = tal_arr(tmpctx, struct htlc_stub, num_htlcs);
+	tell_if_missing = tal_arr(htlcs, bool, num_htlcs);
+	tell_immediately = tal_arr(htlcs, bool, num_htlcs);
 	if (!htlcs || !tell_if_missing || !tell_immediately)
 		status_failed(STATUS_FAIL_INTERNAL_ERROR,
 			      "Can't allocate %"PRIu64" htlcs", num_htlcs);
