@@ -16,7 +16,7 @@ services:
     volumes:
     - "./groestlcoin_datadir:/data"
   clightning_groestlcoin:
-    image: kukks/grs-clightning:latest
+    image: groestlcoin/lightning:v0.6.2
     stop_signal: SIGKILL
     container_name: clightning_groestlcoin
     restart: unless-stopped
