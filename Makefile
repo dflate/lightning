@@ -334,7 +334,18 @@ gen_version.h: FORCE
 	@(echo "#define VERSION \"$(VERSION)\"" && echo "#define BUILD_FEATURES \"$(FEATURES)\"") > $@.new
 	@if cmp $@.new $@ >/dev/null 2>&2; then rm -f $@.new; else mv $@.new $@; echo Version updated; fi
 
-# All binaries require the external libs, ccan
+# We force make to relink this every time, to detect version changes.
+tools/headerversions: FORCE tools/headerversions.o $(CCAN_OBJS)
+	@$(LINK.o) tools/headerversions.o $(CCAN_OBJS) $(LOADLIBES) $(LDLIBS) -o $@
+
+# That forces this rule to be run every time, too.
+gen_header_versions.h: tools/headerversions
+	@tools/headerversions $@
+
+# Rebuild the world if this changes.
+ALL_GEN_HEADERS += gen_header_versions.h
+
+# All binaries require the external libs, ccan and system library versions.
 $(ALL_PROGRAMS) $(ALL_TEST_PROGRAMS): $(EXTERNAL_LIBS) $(CCAN_OBJS)
 
 # Each test program depends on its own object.
