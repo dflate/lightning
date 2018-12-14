@@ -2008,8 +2008,7 @@ bool wallet_network_check(struct wallet *w,
 					   "match network blockchain hash: %s "
 					   "!= %s. "
 					   "Are you on the right network? "
-					   "(--network={bitcoin, testnet, regtest, "
-					   "litecoin or litecoin-testnet})",
+					   "(--network={groestlcoin, testnet, regtest}), ",
 				   type_to_string(w, struct bitcoin_blkid,
 						  &chainhash),
 				   type_to_string(w, struct bitcoin_blkid,

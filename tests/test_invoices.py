@@ -46,7 +46,7 @@ def test_invoice(node_factory):
     # By bech32 rules, the last '1' digit is the separator
     # between the human-readable and data parts. We want
     # to match the "lngrsrt1" above with the '1' digit as the
-    # separator, and not for example "lnbcrt1m1....".
+    # separator, and not for example "lngrsrt1m1....".
     assert b11.count('1') == 1
     # There's no incoming channel, so no routeboost
     assert 'routes' not in b11
