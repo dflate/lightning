@@ -1146,7 +1146,7 @@ static void json_getinfo(struct command *cmd,
     json_add_string(response, "version", version());
     json_add_num(response, "blockheight", get_block_height(cmd->ld->topology));
     json_add_string(response, "network", get_chainparams(cmd->ld)->network_name);
-    json_add_u64(response, "msatoshi_fees_collected",
+    json_add_u64(response, "mgro_fees_collected",
              wallet_total_forward_fees(cmd->ld->wallet));
     json_object_end(response);
     command_success(cmd, response);
@@ -1517,4 +1517,3 @@ void peer_dev_memleak(struct command *cmd)
 	peer_memleak_req_next(cmd, NULL);
 }
 #endif /* DEVELOPER */
-
