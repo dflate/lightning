@@ -105,10 +105,10 @@ def test_balance(node_factory):
     l1, l2 = node_factory.line_graph(2, fundchannel=True)
     p1 = only_one(l1.rpc.getpeer(peer_id=l2.info['id'], level='info')['channels'])
     p2 = only_one(l2.rpc.getpeer(l1.info['id'], 'info')['channels'])
-    assert p1['mgro_to_us'] == 10**6 * 1000
-    assert p1['mgro_total'] == 10**6 * 1000
-    assert p2['mgro_to_us'] == 0
-    assert p2['mgro_total'] == 10**6 * 1000
+    assert p1['msatoshi_to_us'] == 10**6 * 1000
+    assert p1['msatoshi_total'] == 10**6 * 1000
+    assert p2['msatoshi_to_us'] == 0
+    assert p2['msatoshi_total'] == 10**6 * 1000
 
 
 def test_bad_opening(node_factory):
@@ -390,7 +390,7 @@ def test_reconnect_sender_add1(node_factory):
     rhash = l2.rpc.invoice(amt, 'test_reconnect_sender_add1', 'desc')['payment_hash']
     assert only_one(l2.rpc.listinvoices('test_reconnect_sender_add1')['invoices'])['status'] == 'unpaid'
 
-    route = [{'mgro': amt, 'id': l2.info['id'], 'delay': 5, 'channel': '1:1:1'}]
+    route = [{'msatoshi': amt, 'id': l2.info['id'], 'delay': 5, 'channel': '1:1:1'}]
 
     for i in range(0, len(disconnects)):
         l1.rpc.sendpay(route, rhash)
@@ -425,7 +425,7 @@ def test_reconnect_sender_add(node_factory):
     rhash = l2.rpc.invoice(amt, 'testpayment', 'desc')['payment_hash']
     assert only_one(l2.rpc.listinvoices('testpayment')['invoices'])['status'] == 'unpaid'
 
-    route = [{'mgro': amt, 'id': l2.info['id'], 'delay': 5, 'channel': '1:1:1'}]
+    route = [{'msatoshi': amt, 'id': l2.info['id'], 'delay': 5, 'channel': '1:1:1'}]
 
     # This will send commit, so will reconnect as required.
     l1.rpc.sendpay(route, rhash)
@@ -486,7 +486,7 @@ def test_reconnect_receiver_fulfill(node_factory):
     rhash = l2.rpc.invoice(amt, 'testpayment2', 'desc')['payment_hash']
     assert only_one(l2.rpc.listinvoices('testpayment2')['invoices'])['status'] == 'unpaid'
 
-    route = [{'mgro': amt, 'id': l2.info['id'], 'delay': 5, 'channel': '1:1:1'}]
+    route = [{'msatoshi': amt, 'id': l2.info['id'], 'delay': 5, 'channel': '1:1:1'}]
     l1.rpc.sendpay(route, rhash)
     for i in range(len(disconnects)):
         l1.daemon.wait_for_log('Already have funding locked in')
@@ -774,7 +774,7 @@ def test_channel_persistence(node_factory, bitcoind, executor):
     wait_for(lambda: len(l2.rpc.listpeers()['peers']) == 1)
 
     # Wait for the restored HTLC to finish
-    wait_for(lambda: only_one(l1.rpc.listpeers()['peers'][0]['channels'])['mgro_to_us'] == 99990000)
+    wait_for(lambda: only_one(l1.rpc.listpeers()['peers'][0]['channels'])['msatoshi_to_us'] == 99990000)
 
     wait_for(lambda: len([p for p in l1.rpc.listpeers()['peers'] if p['connected']]))
     wait_for(lambda: len([p for p in l2.rpc.listpeers()['peers'] if p['connected']]))
@@ -784,12 +784,12 @@ def test_channel_persistence(node_factory, bitcoind, executor):
 
     # L1 doesn't actually update msatoshi_to_us until it receives
     # revoke_and_ack from L2, which can take a little bit.
-    wait_for(lambda: only_one(l1.rpc.listpeers()['peers'][0]['channels'])['mgro_to_us'] == 99980000)
-    assert only_one(l2.rpc.listpeers()['peers'][0]['channels'])['mgro_to_us'] == 20000
+    wait_for(lambda: only_one(l1.rpc.listpeers()['peers'][0]['channels'])['msatoshi_to_us'] == 99980000)
+    assert only_one(l2.rpc.listpeers()['peers'][0]['channels'])['msatoshi_to_us'] == 20000
 
     # Finally restart l1, and make sure it remembers
     l1.restart()
-    assert only_one(l1.rpc.listpeers()['peers'][0]['channels'])['mgro_to_us'] == 99980000
+    assert only_one(l1.rpc.listpeers()['peers'][0]['channels'])['msatoshi_to_us'] == 99980000
 
     # Now make sure l1 is watching for unilateral closes
     l2.rpc.dev_fail(l1.info['id'])

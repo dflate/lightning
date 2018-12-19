@@ -311,7 +311,7 @@ static void json_getroute(struct command *cmd,
 
 	if (!param(cmd, buffer, params,
 		   p_req("id", json_tok_pubkey, &destination),
-		   p_req("mgro", json_tok_u64, &msatoshi),
+		   p_req("msatoshi", json_tok_u64, &msatoshi),
 		   p_req("riskfactor", json_tok_double, &riskfactor),
 		   p_opt_def("cltv", json_tok_number, &cltv, 9),
 		   p_opt_def("fromid", json_tok_pubkey, &source, ld->id),
@@ -344,7 +344,7 @@ static void json_getroute(struct command *cmd,
 static const struct json_command getroute_command = {
 	"getroute",
 	json_getroute,
-	"Show route to {id} for {mgro}, using {riskfactor} and optional {cltv} (default 9). "
+	"Show route to {id} for {msatoshi}, using {riskfactor} and optional {cltv} (default 9). "
 	"If specified search from {fromid} otherwise use this node as source. "
 	"Randomize the route with up to {fuzzpercent} (default 5.0) "
 	"using {seed} as an arbitrary-size string seed."

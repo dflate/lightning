@@ -359,10 +359,10 @@ def test_sendpay(node_factory):
     # FIXME: test paying via another node, should fail to pay twice.
     p1 = l1.rpc.getpeer(l2.info['id'], 'info')
     p2 = l2.rpc.getpeer(l1.info['id'], 'info')
-    assert only_one(p1['channels'])['mgro_to_us'] == 10**6 * 1000
-    assert only_one(p1['channels'])['mgro_total'] == 10**6 * 1000
-    assert only_one(p2['channels'])['mgro_to_us'] == 0
-    assert only_one(p2['channels'])['mgro_total'] == 10**6 * 1000
+    assert only_one(p1['channels'])['msatoshi_to_us'] == 10**6 * 1000
+    assert only_one(p1['channels'])['msatoshi_total'] == 10**6 * 1000
+    assert only_one(p2['channels'])['msatoshi_to_us'] == 0
+    assert only_one(p2['channels'])['msatoshi_total'] == 10**6 * 1000
 
     # This works.
     before = int(time.time())
@@ -385,10 +385,10 @@ def test_sendpay(node_factory):
         p1 = l1.rpc.getpeer(l2.info['id'], 'info')
         p2 = l2.rpc.getpeer(l1.info['id'], 'info')
         return (
-            only_one(p1['channels'])['mgro_to_us'] == 10**6 * 1000 - amt
-            and only_one(p1['channels'])['mgro_total'] == 10**6 * 1000
-            and only_one(p2['channels'])['mgro_to_us'] == amt
-            and only_one(p2['channels'])['mgro_total'] == 10**6 * 1000
+            only_one(p1['channels'])['msatoshi_to_us'] == 10**6 * 1000 - amt
+            and only_one(p1['channels'])['msatoshi_total'] == 10**6 * 1000
+            and only_one(p2['channels'])['msatoshi_to_us'] == amt
+            and only_one(p2['channels'])['msatoshi_total'] == 10**6 * 1000
         )
     wait_for(check_balances)
 
@@ -712,7 +712,7 @@ def test_forward_different_fees_and_cltv(node_factory, bitcoind):
                            .format(bitcoind.rpc.getblockcount() + 20 + 9 + shadow_route))
     l2.daemon.wait_for_log("Adding HTLC 0 msat=4999999 cltv={} gave CHANNEL_ERR_ADD_OK"
                            .format(bitcoind.rpc.getblockcount() + 9 + shadow_route))
-    l3.daemon.wait_for_log("test_forward_different_fees_and_cltv: Actual amount 4999999mgro, HTLC expiry {}"
+    l3.daemon.wait_for_log("test_forward_different_fees_and_cltv: Actual amount 4999999msat, HTLC expiry {}"
                            .format(bitcoind.rpc.getblockcount() + 9 + shadow_route))
     assert only_one(l3.rpc.listinvoices('test_forward_different_fees_and_cltv')['invoices'])['status'] == 'paid'
 

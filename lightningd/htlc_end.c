@@ -148,7 +148,7 @@ struct htlc_out *htlc_out_check(const struct htlc_out *hout,
 
 	if (hout->in) {
 		if (hout->in->msatoshi < hout->msatoshi)
-			return corrupt(abortstr, "Input mgro %"PRIu64
+			return corrupt(abortstr, "Input msatoshi %"PRIu64
 				       " less than %"PRIu64,
 				       hout->in->msatoshi, hout->msatoshi);
 		if (hout->in->cltv_expiry <= hout->cltv_expiry)

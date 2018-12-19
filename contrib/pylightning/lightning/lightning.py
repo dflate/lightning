@@ -149,7 +149,7 @@ class LightningRpc(UnixDomainSocketRpc):
 
     def getroute(self, peer_id, msatoshi, riskfactor, cltv=9, fromid=None, fuzzpercent=None, seed=None):
         """
-        Show route to {id} for {mgro}, using {riskfactor} and optional
+        Show route to {id} for {msatoshi}, using {riskfactor} and optional
         {cltv} (default 9). If specified search from {fromid} otherwise use
         this node as source. Randomize the route with up to {fuzzpercent}
         (0.0 -> 100.0, default 5.0) using {seed} as an arbitrary-size string
@@ -157,7 +157,7 @@ class LightningRpc(UnixDomainSocketRpc):
         """
         payload = {
             "id": peer_id,
-            "mgro": msatoshi,
+            "msatoshi": msatoshi,
             "riskfactor": riskfactor,
             "cltv": cltv,
             "fromid": fromid,
@@ -177,11 +177,11 @@ class LightningRpc(UnixDomainSocketRpc):
 
     def invoice(self, msatoshi, label, description, expiry=None, fallbacks=None, preimage=None):
         """
-        Create an invoice for {mgro} with {label} and {description} with
+        Create an invoice for {msatoshi} with {label} and {description} with
         optional {expiry} seconds (default 1 hour)
         """
         payload = {
-            "mgro": msatoshi,
+            "msatoshi": msatoshi,
             "label": label,
             "description": description,
             "expiry": expiry,
@@ -314,7 +314,7 @@ class LightningRpc(UnixDomainSocketRpc):
 
     def pay(self, bolt11, msatoshi=None, description=None, riskfactor=None):
         """
-        Send payment specified by {bolt11} with {mgro}
+        Send payment specified by {bolt11} with {msatoshi}
         (ignored if {bolt11} has an amount),
 
         {description} (required if {bolt11} uses description hash)
@@ -322,7 +322,7 @@ class LightningRpc(UnixDomainSocketRpc):
         """
         payload = {
             "bolt11": bolt11,
-            "mgro": msatoshi,
+            "msatoshi": msatoshi,
             "description": description,
             "riskfactor": riskfactor
         }

@@ -610,7 +610,7 @@ static void json_add_htlcs(struct lightningd *ld,
 		json_object_start(response, NULL);
 		json_add_string(response, "direction", "in");
 		json_add_u64(response, "id", hin->key.id);
-		json_add_u64(response, "mgro", hin->msatoshi);
+		json_add_u64(response, "msatoshi", hin->msatoshi);
 		json_add_u64(response, "expiry", hin->cltv_expiry);
 		json_add_hex(response, "payment_hash",
 			     &hin->payment_hash, sizeof(hin->payment_hash));
@@ -628,7 +628,7 @@ static void json_add_htlcs(struct lightningd *ld,
 		json_object_start(response, NULL);
 		json_add_string(response, "direction", "out");
 		json_add_u64(response, "id", hout->key.id);
-		json_add_u64(response, "mgro", hout->msatoshi);
+		json_add_u64(response, "msatoshi", hout->msatoshi);
 		json_add_u64(response, "expiry", hout->cltv_expiry);
 		json_add_hex(response, "payment_hash",
 			     &hout->payment_hash, sizeof(hout->payment_hash));
@@ -712,19 +712,19 @@ static void json_add_peer(struct lightningd *ld,
 		json_add_txid(response,
 			      "funding_txid",
 			      &channel->funding_txid);
-		json_add_u64(response, "mgro_to_us",
+		json_add_u64(response, "msatoshi_to_us",
 			     channel->our_msatoshi);
-		json_add_u64(response, "mgro_to_us_min",
+		json_add_u64(response, "msatoshi_to_us_min",
 			     channel->msatoshi_to_us_min);
-		json_add_u64(response, "mgro_to_us_max",
+		json_add_u64(response, "msatoshi_to_us_max",
 			     channel->msatoshi_to_us_max);
-		json_add_u64(response, "mgro_total",
+		json_add_u64(response, "msatoshi_total",
 			     channel->funding_satoshi * 1000);
 
 		/* channel config */
 		json_add_u64(response, "dust_limit_gro",
 			     channel->our_config.dust_limit_satoshis);
-		json_add_u64(response, "max_htlc_value_in_flight_mgro",
+		json_add_u64(response, "max_htlc_value_in_flight_msat",
 			     channel->our_config.max_htlc_value_in_flight_msat);
 
 		/* The `channel_reserve_satoshis` is imposed on
@@ -740,11 +740,11 @@ static void json_add_peer(struct lightningd *ld,
 			     channel->channel_info.their_config.channel_reserve_satoshis);
 		/* Compute how much we can send via this channel. */
 		if (channel->our_msatoshi <= our_reserve_msat)
-			json_add_u64(response, "spendable_mgro", 0);
+			json_add_u64(response, "spendable_msatoshi", 0);
 		else
-			json_add_u64(response, "spendable_mgro",
+			json_add_u64(response, "spendable_msatoshi",
 				     channel->our_msatoshi - our_reserve_msat);
-		json_add_u64(response, "htlc_minimum_mgro",
+		json_add_u64(response, "htlc_minimum_msat",
 			     channel->our_config.htlc_minimum_msat);
 
 		/* The `to_self_delay` is imposed on the *other*
@@ -778,19 +778,19 @@ static void json_add_peer(struct lightningd *ld,
 					  &channel_stats);
 		json_add_u64(response, "in_payments_offered",
 			     channel_stats.in_payments_offered);
-		json_add_u64(response, "in_mgro_offered",
+		json_add_u64(response, "in_msatoshi_offered",
 			     channel_stats.in_msatoshi_offered);
 		json_add_u64(response, "in_payments_fulfilled",
 			     channel_stats.in_payments_fulfilled);
-		json_add_u64(response, "in_mgro_fulfilled",
+		json_add_u64(response, "in_msatoshi_offered_fulfilled",
 			     channel_stats.in_msatoshi_fulfilled);
 		json_add_u64(response, "out_payments_offered",
 			     channel_stats.out_payments_offered);
-		json_add_u64(response, "out_mgro_offered",
+		json_add_u64(response, "out_msatoshi_offered",
 			     channel_stats.out_msatoshi_offered);
 		json_add_u64(response, "out_payments_fulfilled",
 			     channel_stats.out_payments_fulfilled);
-		json_add_u64(response, "out_mgro_fulfilled",
+		json_add_u64(response, "out_msatoshi_offered_fulfilled",
 			     channel_stats.out_msatoshi_fulfilled);
 
 		json_add_htlcs(ld, response, channel);
@@ -1517,4 +1517,3 @@ void peer_dev_memleak(struct command *cmd)
 	peer_memleak_req_next(cmd, NULL);
 }
 #endif /* DEVELOPER */
-

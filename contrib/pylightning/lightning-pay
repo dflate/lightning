@@ -34,9 +34,9 @@ if use_bolt11:
     print("Bolt11 decoded:\n%s" % json.dumps(bolt11, indent=4))
     id_ = bolt11["payee"]
     payment_hash = bolt11["payment_hash"]
-    if "mgro" in bolt11:
+    if "msatoshi" in bolt11:
         amount_included_in_bolt = True
-        amount = bolt11["mgro"]
+        amount = bolt11["msatoshi"]
     else:
         assert args.amount_in_milli_satoshi, "need argument amount_in_milli_gro"
         amount = args.amount_in_milli_satoshi
@@ -62,7 +62,7 @@ else:
     min_cltv_expiry = args.min_final_cltv_expiry
 
     route = ld.getroute(id_, amount, 1, min_cltv_expiry)
-    fee = route["route"][0]["mgro"] - amount
+    fee = route["route"][0]["msatoshi"] - amount
 
     reply = input("Paying fee %s on amount %s (%.3f%%). Send [Y/n]? " % (fee, amount, fee / amount * 100.0))
 

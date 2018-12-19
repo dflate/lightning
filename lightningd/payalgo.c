@@ -370,7 +370,7 @@ static char const *stringify_route(const tal_t *ctx, struct route_hop *route)
 	size_t i;
 	char *rv = tal_strdup(ctx, "us");
 	for (i = 0; i < tal_count(route); ++i)
-		tal_append_fmt(&rv, " -> %s (%"PRIu64"mgro, %"PRIu32"blk) -> %s",
+		tal_append_fmt(&rv, " -> %s (%"PRIu64"msat, %"PRIu32"blk) -> %s",
 			       type_to_string(ctx, struct short_channel_id, &route[i].channel_id),
 			       route[i].amount, route[i].delay,
 			       type_to_string(ctx, struct pubkey, &route[i].nodeid));
@@ -461,7 +461,7 @@ static void json_pay_getroute_reply(struct subd *gossip UNUSED,
 
 		data = json_stream_fail(pay->cmd, PAY_ROUTE_TOO_EXPENSIVE, err);
 		json_object_start(data, NULL);
-		json_add_u64(data, "mgro", pay->msatoshi);
+		json_add_u64(data, "msatoshi", pay->msatoshi);
 		json_add_u64(data, "fee", fee);
 		json_add_double(data, "feepercent", feepercent);
 		json_add_double(data, "maxfeepercent", pay->maxfeepercent);
@@ -610,7 +610,7 @@ static void json_pay(struct command *cmd,
 
 	if (!param(cmd, buffer, params,
 		   p_req("bolt11", json_tok_string, &b11str),
-		   p_opt("mgro", json_tok_u64, &msatoshi),
+		   p_opt("msatoshi", json_tok_u64, &msatoshi),
 		   p_opt("description", json_tok_string, &desc),
 		   p_opt_def("riskfactor", json_tok_double, &riskfactor, 1.0),
 		   p_opt_def("maxfeepercent", json_tok_percent, &maxfeepercent, 0.5),
@@ -698,12 +698,12 @@ static void json_pay(struct command *cmd,
 static const struct json_command pay_command = {
 	"pay",
 	json_pay,
-	"Send payment specified by {bolt11} with {mgro} "
+	"Send payment specified by {bolt11} with {msatoshi} "
 	"(ignored if {bolt11} has an amount), "
 	"{description} (required if {bolt11} uses description hash), "
 	"{riskfactor} (default 1.0), "
 	"{maxfeepercent} (default 0.5) the maximum acceptable fee as a percentage (e.g. 0.5 => 0.5%), "
-	"{exemptfee} (default 5000 mgro) disables the maxfeepercent check for fees below the threshold, "
+	"{exemptfee} (default 5000 msat) disables the maxfeepercent check for fees below the threshold, "
 	"{retry_for} (default 60) the integer number of seconds before we stop retrying, and "
 	"{maxdelay} (default 500) the maximum number of blocks we allow the funds to possibly get locked"
 };
