@@ -122,7 +122,7 @@ Let's assume the **remote** node is accepting connections at `<ip>`
 
 ```
 cli/lightning-cli connect <node_id> <ip> [<port>]
-cli/lightning-cli fundchannel <node_id> <amount_in_gro>
+cli/lightning-cli fundchannel <node_id> <amount_in_satoshis>
 ```
 
 This opens a connection and, on top of that connection, then opens
@@ -211,7 +211,7 @@ lightningd/lightningd --help
 ## Further information
 
 ### Developers
-Developers wishing to contribute should start with the developer guide [here](doc/HACKING.md). 
+Developers wishing to contribute should start with the developer guide [here](doc/HACKING.md).
 
 
 ### JSON RPC

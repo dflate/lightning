@@ -782,7 +782,7 @@ static void json_fund_channel(struct command *cmd,
 	wtx_init(cmd, &fc->wtx);
 	if (!param(fc->cmd, buffer, params,
 		   p_req("id", json_tok_pubkey, &id),
-		   p_req("gro", json_tok_tok, &sattok),
+		   p_req("satoshi", json_tok_tok, &sattok),
 		   p_opt("feerate", json_tok_feerate, &feerate_per_kw),
 		   p_opt_def("announce", json_tok_bool, &announce_channel, true),
 		   NULL))
@@ -865,7 +865,7 @@ static void json_fund_channel(struct command *cmd,
 static const struct json_command fund_channel_command = {
 	"fundchannel",
 	json_fund_channel,
-	"Fund channel with {id} using {gro} (or 'all') gro's, at optional {feerate}"
+	"Fund channel with {id} using {satoshi} (or 'all') satoshis, at optional {feerate}"
 };
 AUTODATA(json_command, &fund_channel_command);
 

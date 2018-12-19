@@ -101,7 +101,7 @@ static void json_withdraw(struct command *cmd,
 
 	if (!param(cmd, buffer, params,
 		   p_req("destination", json_tok_tok, &desttok),
-		   p_req("gro", json_tok_tok, &sattok),
+		   p_req("satoshi", json_tok_tok, &sattok),
 		   p_opt("feerate", json_tok_feerate, &feerate_per_kw),
 		   NULL))
 		return;
@@ -165,8 +165,8 @@ static void json_withdraw(struct command *cmd,
 static const struct json_command withdraw_command = {
 	"withdraw",
 	json_withdraw,
-	"Send to {destination} address {gro} (or 'all') amount via Groestlcoin transaction, at optional {feerate}",
-	false, "Send funds from the internal wallet to the specified address. Either specify a number of gro's to send or 'all' to sweep all funds in the internal wallet to the address."
+	"Send to {destination} address {satoshi} (or 'all') amount via Groestlcoin transaction, at optional {feerate}",
+	false, "Send funds from the internal wallet to the specified address. Either specify a number of satoshis to send or 'all' to sweep all funds in the internal wallet to the address."
 };
 AUTODATA(json_command, &withdraw_command);
 
@@ -446,9 +446,9 @@ static void json_listfunds(struct command *cmd,
 							  c->scid);
 
 			/* Poor man's rounding to satoshis to match the unit for outputs */
-			json_add_u64(response, "channel_gro",
+			json_add_u64(response, "channel_sat",
 				     (c->our_msatoshi + 500)/1000);
-			json_add_u64(response, "channel_total_gro",
+			json_add_u64(response, "channel_total_sat",
 				     c->funding_satoshi);
 			json_add_txid(response, "funding_txid",
 				      &c->funding_txid);

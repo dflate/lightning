@@ -363,13 +363,13 @@ class LightningRpc(UnixDomainSocketRpc):
 
     def fundchannel(self, node_id, satoshi, feerate=None, announce=True):
         """
-        Fund channel with {id} using {gro} gro's
+        Fund channel with {id} using {satoshi} satoshis
         with feerate of {feerate} (uses default feerate if unset).
         If {announce} is False, don't send channel announcements.
         """
         payload = {
             "id": node_id,
-            "gro": satoshi,
+            "satoshi": satoshi,
             "feerate": feerate,
             "announce": announce
         }
@@ -440,12 +440,12 @@ class LightningRpc(UnixDomainSocketRpc):
 
     def withdraw(self, destination, satoshi, feerate=None):
         """
-        Send to {destination} address {gro} (or "all")
+        Send to {destination} address {satoshi} (or "all")
         amount via Groestlcoin transaction
         """
         payload = {
             "destination": destination,
-            "gro": satoshi,
+            "satoshi": satoshi,
             "feerate": feerate
         }
         return self.call("withdraw", payload)

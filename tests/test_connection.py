@@ -454,7 +454,7 @@ def test_reconnect_receiver_add(node_factory):
     rhash = l2.rpc.invoice(amt, 'testpayment2', 'desc')['payment_hash']
     assert only_one(l2.rpc.listinvoices('testpayment2')['invoices'])['status'] == 'unpaid'
 
-    route = [{'gro': amt, 'id': l2.info['id'], 'delay': 5, 'channel': '1:1:1'}]
+    route = [{'msatoshi': amt, 'id': l2.info['id'], 'delay': 5, 'channel': '1:1:1'}]
     l1.rpc.sendpay(route, rhash)
     for i in range(len(disconnects)):
         l1.daemon.wait_for_log('Already have funding locked in')
@@ -618,7 +618,7 @@ def test_funding_all_too_much(node_factory):
     l1.rpc.fundchannel(l2.info['id'], "all")
     l1.bitcoin.rpc.generate(10)
     assert only_one(l1.rpc.listfunds()['outputs'])['status'] == 'unconfirmed'
-    assert only_one(l1.rpc.listfunds()['channels'])['channel_total_gro'] == 2**24 - 1
+    assert only_one(l1.rpc.listfunds()['channels'])['channel_total_sat'] == 2**24 - 1
 
 
 def test_funding_fail(node_factory, bitcoind):

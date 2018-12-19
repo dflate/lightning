@@ -372,7 +372,7 @@ static void config_register_opts(struct lightningd *ld)
 			 &ld->config.rescan,
 			 "Number of blocks to rescan from the current head, or "
 			 "absolute blockheight if negative");
-	opt_register_arg("--fee-per-gro", opt_set_s32, opt_show_s32,
+	opt_register_arg("--fee-per-satoshi", opt_set_s32, opt_show_s32,
 			 &ld->config.fee_per_satoshi,
 			 "Microgro fee for every gro in HTLC");
 	opt_register_arg("--addr", opt_add_addr, NULL,

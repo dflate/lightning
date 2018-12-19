@@ -8,7 +8,7 @@ from lightning import LightningRpc
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("bolt11_or_destination_id")
-parser.add_argument("amount_in_milli_gro", default=None, type=int, nargs="?")
+parser.add_argument("amount_in_milli_satoshi", default=None, type=int, nargs="?")
 parser.add_argument("payment_hash", nargs="?")
 parser.add_argument("min_final_cltv_expiry", nargs="?")
 args = parser.parse_args()
@@ -38,7 +38,7 @@ if use_bolt11:
         amount_included_in_bolt = True
         amount = bolt11["msatoshi"]
     else:
-        assert args.amount_in_milli_satoshi, "need argument amount_in_milli_gro"
+        assert args.amount_in_milli_satoshi, "need argument amount_in_milli_satoshi"
         amount = args.amount_in_milli_satoshi
         amount_included_in_bolt = False
 
@@ -53,7 +53,7 @@ if use_bolt11:
         print("Not sending.")
 
 else:
-    assert args.amount_in_milli_satoshi, "need argument amount_in_milli_gro"
+    assert args.amount_in_milli_satoshi, "need argument amount_in_milli_satoshi"
     assert args.payment_hash, "need argument payment_hash"
     assert args.min_final_cltv_expiry, "need argument min_final_cltv_expiry"
     amount = args.amount_in_milli_satoshi
