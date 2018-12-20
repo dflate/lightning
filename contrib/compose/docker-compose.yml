@@ -39,7 +39,7 @@ services:
     links:
     - groestlcoind
   clightning_groestlcoin_spark:
-    image: shesek/spark-wallet
+    image: groestlcoin/spark-wallet:v0.2.1
     container_name: clightning_groestlcoin_spark
     restart: unless-stopped
     environment:
