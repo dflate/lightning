@@ -409,7 +409,7 @@ static void config_register_opts(struct lightningd *ld)
 			 "Perform cleanup of expired invoices every given seconds, or do not autoclean if 0");
 	opt_register_arg("--autocleaninvoice-expired-by",
 			 opt_set_u64, opt_show_u64,
-			 &ld->ini_autocleaninvoice_cycle,
+			 &ld->ini_autocleaninvoice_expiredby,
 			 "If expired invoice autoclean enabled, invoices that have expired for at least this given seconds are cleaned");
 	opt_register_arg("--proxy", opt_add_proxy_addr, NULL,
 			ld,"Set a socks v5 proxy IP address and port");
@@ -1050,19 +1050,19 @@ static void add_config(struct lightningd *ld,
 	tal_free(name0);
 }
 
-static void json_listconfigs(struct command *cmd,
-			     const char *buffer,
-			     const jsmntok_t *obj UNNEEDED,
-			     const jsmntok_t *params)
+static struct command_result *json_listconfigs(struct command *cmd,
+					       const char *buffer,
+					       const jsmntok_t *obj UNNEEDED,
+					       const jsmntok_t *params)
 {
 	size_t i;
 	struct json_stream *response = NULL;
 	const jsmntok_t *configtok;
 
 	if (!param(cmd, buffer, params,
-		   p_opt("config", json_tok_tok, &configtok),
+		   p_opt("config", param_tok, &configtok),
 		   NULL))
-		return;
+		return command_param_failed();
 
 	if (!configtok) {
 		response = json_stream_success(cmd);
@@ -1101,14 +1101,13 @@ static void json_listconfigs(struct command *cmd,
 	}
 
 	if (configtok && !response) {
-		command_fail(cmd, JSONRPC2_INVALID_PARAMS,
-			     "Unknown config option '%.*s'",
-			     configtok->end - configtok->start,
-			     buffer + configtok->start);
-		return;
+		return command_fail(cmd, JSONRPC2_INVALID_PARAMS,
+				    "Unknown config option '%.*s'",
+				    json_tok_full_len(configtok),
+				    json_tok_full(buffer, configtok));
 	}
 	json_object_end(response);
-	command_success(cmd, response);
+	return command_success(cmd, response);
 }
 
 static const struct json_command listconfigs_command = {

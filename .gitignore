@@ -32,7 +32,8 @@ test/test_sphinx
 tests/.pytest.restart
 gossip_store
 .pytest_cache
+tools/headerversions
+.tmp.lightningrfc/
 
 contrib/compose/groestlcoin_datadir/
-
 contrib/compose/clightning_groestlcoin_datadir/

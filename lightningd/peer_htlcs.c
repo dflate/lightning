@@ -1792,30 +1792,29 @@ void htlcs_reconnect(struct lightningd *ld,
 
 
 #if DEVELOPER
-static void json_dev_ignore_htlcs(struct command *cmd,
-				  const char *buffer,
-				  const jsmntok_t *obj UNNEEDED,
-				  const jsmntok_t *params)
+static struct command_result *json_dev_ignore_htlcs(struct command *cmd,
+						    const char *buffer,
+						    const jsmntok_t *obj UNNEEDED,
+						    const jsmntok_t *params)
 {
 	struct pubkey *peerid;
 	struct peer *peer;
 	bool *ignore;
 
 	if (!param(cmd, buffer, params,
-		   p_req("id", json_tok_pubkey, &peerid),
-		   p_req("ignore", json_tok_bool, &ignore),
+		   p_req("id", param_pubkey, &peerid),
+		   p_req("ignore", param_bool, &ignore),
 		   NULL))
-		return;
+		return command_param_failed();
 
 	peer = peer_by_id(cmd->ld, peerid);
 	if (!peer) {
-		command_fail(cmd, LIGHTNINGD,
-			     "Could not find channel with that peer");
-		return;
+		return command_fail(cmd, LIGHTNINGD,
+				    "Could not find channel with that peer");
 	}
 	peer->ignore_htlcs = *ignore;
 
-	command_success(cmd, null_response(cmd));
+	return command_success(cmd, null_response(cmd));
 }
 
 static const struct json_command dev_ignore_htlcs = {
@@ -1849,22 +1848,22 @@ static void listforwardings_add_forwardings(struct json_stream *response, struct
 	tal_free(forwardings);
 }
 
-static void json_listforwards(struct command *cmd,
-			      const char *buffer,
-			      const jsmntok_t *obj UNNEEDED,
-			      const jsmntok_t *params)
+static struct command_result *json_listforwards(struct command *cmd,
+						const char *buffer,
+						const jsmntok_t *obj UNNEEDED,
+						const jsmntok_t *params)
 {
 	struct json_stream *response;
 
 	if (!param(cmd, buffer, params, NULL))
-		return;
+		return command_param_failed();
 
 	response = json_stream_success(cmd);
 	json_object_start(response, NULL);
 	listforwardings_add_forwardings(response, cmd->ld->wallet);
 	json_object_end(response);
 
-	command_success(cmd, response);
+	return command_success(cmd, response);
 }
 
 static const struct json_command listforwards_command = {

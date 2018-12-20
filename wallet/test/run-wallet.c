@@ -51,14 +51,22 @@ bool channel_tell_funding_locked(struct lightningd *ld UNNEEDED,
 				 u32 depth UNNEEDED)
 { fprintf(stderr, "channel_tell_funding_locked called!\n"); abort(); }
 /* Generated stub for command_fail */
-void  command_fail(struct command *cmd UNNEEDED, int code UNNEEDED,
-				   const char *fmt UNNEEDED, ...)
+struct command_result *command_fail(struct command *cmd UNNEEDED, int code UNNEEDED,
+				    const char *fmt UNNEEDED, ...)
+
 { fprintf(stderr, "command_fail called!\n"); abort(); }
+/* Generated stub for command_param_failed */
+struct command_result *command_param_failed(void)
+
+{ fprintf(stderr, "command_param_failed called!\n"); abort(); }
 /* Generated stub for command_still_pending */
-void command_still_pending(struct command *cmd UNNEEDED)
+struct command_result *command_still_pending(struct command *cmd)
+
 { fprintf(stderr, "command_still_pending called!\n"); abort(); }
 /* Generated stub for command_success */
-void command_success(struct command *cmd UNNEEDED, struct json_stream *response UNNEEDED)
+struct command_result *command_success(struct command *cmd UNNEEDED,
+				       struct json_stream *response)
+
 { fprintf(stderr, "command_success called!\n"); abort(); }
 /* Generated stub for connect_succeeded */
 void connect_succeeded(struct lightningd *ld UNNEEDED, const struct pubkey *id UNNEEDED)
@@ -255,40 +263,16 @@ void json_object_start(struct json_stream *ks UNNEEDED, const char *fieldname UN
 /* Generated stub for json_stream_success */
 struct json_stream *json_stream_success(struct command *cmd UNNEEDED)
 { fprintf(stderr, "json_stream_success called!\n"); abort(); }
-/* Generated stub for json_tok_bool */
-bool json_tok_bool(struct command *cmd UNNEEDED, const char *name UNNEEDED,
-		   const char *buffer UNNEEDED, const jsmntok_t *tok UNNEEDED,
-		   bool **b UNNEEDED)
-{ fprintf(stderr, "json_tok_bool called!\n"); abort(); }
 /* Generated stub for json_tok_channel_id */
 bool json_tok_channel_id(const char *buffer UNNEEDED, const jsmntok_t *tok UNNEEDED,
 			 struct channel_id *cid UNNEEDED)
 { fprintf(stderr, "json_tok_channel_id called!\n"); abort(); }
-/* Generated stub for json_tok_loglevel */
-bool json_tok_loglevel(struct command *cmd UNNEEDED, const char *name UNNEEDED,
-		       const char *buffer UNNEEDED, const jsmntok_t *tok UNNEEDED,
-		       enum log_level **level UNNEEDED)
-{ fprintf(stderr, "json_tok_loglevel called!\n"); abort(); }
-/* Generated stub for json_tok_number */
-bool json_tok_number(struct command *cmd UNNEEDED, const char *name UNNEEDED,
-		     const char *buffer UNNEEDED, const jsmntok_t *tok UNNEEDED,
-		     unsigned int **num UNNEEDED)
-{ fprintf(stderr, "json_tok_number called!\n"); abort(); }
-/* Generated stub for json_tok_pubkey */
-bool json_tok_pubkey(struct command *cmd UNNEEDED, const char *name UNNEEDED,
-		     const char *buffer UNNEEDED, const jsmntok_t *tok UNNEEDED,
-		     struct pubkey **pubkey UNNEEDED)
-{ fprintf(stderr, "json_tok_pubkey called!\n"); abort(); }
-/* Generated stub for json_tok_short_channel_id */
-bool json_tok_short_channel_id(struct command *cmd UNNEEDED, const char *name UNNEEDED,
-			       const char *buffer UNNEEDED, const jsmntok_t *tok UNNEEDED,
-			       struct short_channel_id **scid UNNEEDED)
-{ fprintf(stderr, "json_tok_short_channel_id called!\n"); abort(); }
-/* Generated stub for json_tok_tok */
-bool json_tok_tok(struct command *cmd UNNEEDED, const char *name UNNEEDED,
-		  const char *buffer UNNEEDED, const jsmntok_t * tok UNNEEDED,
-		  const jsmntok_t **out UNNEEDED)
-{ fprintf(stderr, "json_tok_tok called!\n"); abort(); }
+/* Generated stub for json_tok_full */
+const char *json_tok_full(const char *buffer UNNEEDED, const jsmntok_t *t UNNEEDED)
+{ fprintf(stderr, "json_tok_full called!\n"); abort(); }
+/* Generated stub for json_tok_full_len */
+int json_tok_full_len(const jsmntok_t *t UNNEEDED)
+{ fprintf(stderr, "json_tok_full_len called!\n"); abort(); }
 /* Generated stub for json_to_pubkey */
 bool json_to_pubkey(const char *buffer UNNEEDED, const jsmntok_t *tok UNNEEDED,
 		    struct pubkey *pubkey UNNEEDED)
@@ -341,6 +325,40 @@ void outpointfilter_remove(struct outpointfilter *of UNNEEDED,
 bool param(struct command *cmd UNNEEDED, const char *buffer UNNEEDED,
 	   const jsmntok_t params[] UNNEEDED, ...)
 { fprintf(stderr, "param called!\n"); abort(); }
+/* Generated stub for param_bool */
+struct command_result *param_bool(struct command *cmd UNNEEDED, const char *name UNNEEDED,
+				  const char *buffer UNNEEDED, const jsmntok_t *tok UNNEEDED,
+				  bool **b UNNEEDED)
+{ fprintf(stderr, "param_bool called!\n"); abort(); }
+/* Generated stub for param_loglevel */
+struct command_result *param_loglevel(struct command *cmd UNNEEDED,
+				      const char *name UNNEEDED,
+				      const char *buffer UNNEEDED,
+				      const jsmntok_t *tok UNNEEDED,
+				      enum log_level **level UNNEEDED)
+{ fprintf(stderr, "param_loglevel called!\n"); abort(); }
+/* Generated stub for param_number */
+struct command_result *param_number(struct command *cmd UNNEEDED, const char *name UNNEEDED,
+				    const char *buffer UNNEEDED, const jsmntok_t *tok UNNEEDED,
+				    unsigned int **num UNNEEDED)
+{ fprintf(stderr, "param_number called!\n"); abort(); }
+/* Generated stub for param_pubkey */
+struct command_result *param_pubkey(struct command *cmd UNNEEDED, const char *name UNNEEDED,
+				    const char *buffer UNNEEDED, const jsmntok_t *tok UNNEEDED,
+				    struct pubkey **pubkey UNNEEDED)
+{ fprintf(stderr, "param_pubkey called!\n"); abort(); }
+/* Generated stub for param_short_channel_id */
+struct command_result *param_short_channel_id(struct command *cmd UNNEEDED,
+					      const char *name UNNEEDED,
+					      const char *buffer UNNEEDED,
+					      const jsmntok_t *tok UNNEEDED,
+					      struct short_channel_id **scid UNNEEDED)
+{ fprintf(stderr, "param_short_channel_id called!\n"); abort(); }
+/* Generated stub for param_tok */
+struct command_result *param_tok(struct command *cmd UNNEEDED, const char *name UNNEEDED,
+				 const char *buffer UNNEEDED, const jsmntok_t * tok UNNEEDED,
+				 const jsmntok_t **out UNNEEDED)
+{ fprintf(stderr, "param_tok called!\n"); abort(); }
 /* Generated stub for parse_onionpacket */
 struct onionpacket *parse_onionpacket(
 	const tal_t *ctx UNNEEDED,

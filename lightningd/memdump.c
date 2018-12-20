@@ -62,20 +62,20 @@ static void add_memdump(struct json_stream *response,
 	json_array_end(response);
 }
 
-static void json_memdump(struct command *cmd,
-			 const char *buffer,
-			 const jsmntok_t *obj UNNEEDED,
-			 const jsmntok_t *params)
+static struct command_result *json_memdump(struct command *cmd,
+					   const char *buffer,
+					   const jsmntok_t *obj UNNEEDED,
+					   const jsmntok_t *params)
 {
 	struct json_stream *response;
 
 	if (!param(cmd, buffer, params, NULL))
-		return;
+		return command_param_failed();
 
 	response = json_stream_success(cmd);
 	add_memdump(response, NULL, NULL, cmd);
 
-	command_success(cmd, response);
+	return command_success(cmd, response);
 }
 
 static const struct json_command dev_memdump_command = {
@@ -181,7 +181,7 @@ static void report_leak_info2(struct leak_info *leak_info)
 	scan_mem(leak_info->cmd, response, leak_info->cmd->ld, leak_info->leaker);
 	json_object_end(response);
 
-	command_success(leak_info->cmd, response);
+	was_pending(command_success(leak_info->cmd, response));
 }
 
 static void report_leak_info(struct command *cmd, struct subd *leaker)
@@ -205,7 +205,8 @@ static void gossip_dev_memleak_done(struct subd *gossipd,
 	bool found_leak;
 
 	if (!fromwire_gossip_dev_memleak_reply(reply, &found_leak)) {
-		command_fail(cmd, LIGHTNINGD, "Bad gossip_dev_memleak");
+		was_pending(command_fail(cmd, LIGHTNINGD,
+					 "Bad gossip_dev_memleak"));
 		return;
 	}
 
@@ -217,11 +218,11 @@ static void connect_dev_memleak_done(struct subd *connectd,
 				     const int *fds UNUSED,
 				     struct command *cmd)
 {
-	struct lightningd *ld = cmd->ld;
 	bool found_leak;
 
 	if (!fromwire_connect_dev_memleak_reply(reply, &found_leak)) {
-		command_fail(cmd, LIGHTNINGD, "Bad connect_dev_memleak");
+		was_pending(command_fail(cmd, LIGHTNINGD,
+					 "Bad connect_dev_memleak"));
 		return;
 	}
 
@@ -230,9 +231,8 @@ static void connect_dev_memleak_done(struct subd *connectd,
 		return;
 	}
 
-	/* No leak?  Ask gossipd. */
-	subd_req(ld->gossip, ld->gossip, take(towire_gossip_dev_memleak(NULL)),
-		 -1, 0, gossip_dev_memleak_done, cmd);
+	/* No leak?  Ask openingd. */
+	opening_dev_memleak(cmd);
 }
 
 static void hsm_dev_memleak_done(struct subd *hsmd,
@@ -243,7 +243,8 @@ static void hsm_dev_memleak_done(struct subd *hsmd,
 	bool found_leak;
 
 	if (!fromwire_hsm_dev_memleak_reply(reply, &found_leak)) {
-		command_fail(cmd, LIGHTNINGD, "Bad hsm_dev_memleak");
+		was_pending(command_fail(cmd, LIGHTNINGD,
+					 "Bad hsm_dev_memleak"));
 		return;
 	}
 
@@ -252,10 +253,9 @@ static void hsm_dev_memleak_done(struct subd *hsmd,
 		return;
 	}
 
-	/* No leak?  Ask connectd. */
-	subd_req(ld->connectd, ld->connectd,
-		 take(towire_connect_dev_memleak(NULL)),
-		 -1, 0, connect_dev_memleak_done, cmd);
+	/* No leak?  Ask gossipd. */
+	subd_req(ld->gossip, ld->gossip, take(towire_gossip_dev_memleak(NULL)),
+		 -1, 0, gossip_dev_memleak_done, cmd);
 }
 
 void peer_memleak_done(struct command *cmd, struct subd *leaker)
@@ -284,26 +284,27 @@ void opening_memleak_done(struct command *cmd, struct subd *leaker)
 	}
 }
 
-static void json_memleak(struct command *cmd,
-			 const char *buffer,
-			 const jsmntok_t *obj UNNEEDED,
-			 const jsmntok_t *params)
+static struct command_result *json_memleak(struct command *cmd,
+					   const char *buffer,
+					   const jsmntok_t *obj UNNEEDED,
+					   const jsmntok_t *params)
 {
+	struct lightningd *ld = cmd->ld;
+
 	if (!param(cmd, buffer, params, NULL))
-		return;
+		return command_param_failed();
 
 	if (!getenv("LIGHTNINGD_DEV_MEMLEAK")) {
-		command_fail(cmd, LIGHTNINGD,
-			     "Leak detection needs $LIGHTNINGD_DEV_MEMLEAK");
-		return;
+		return command_fail(cmd, LIGHTNINGD,
+				    "Leak detection needs $LIGHTNINGD_DEV_MEMLEAK");
 	}
 
-	/* For simplicity, we mark pending, though an error may complete it
-	 * immediately. */
-	command_still_pending(cmd);
+	/* Start by asking connectd, which is always async. */
+	subd_req(ld->connectd, ld->connectd,
+		 take(towire_connect_dev_memleak(NULL)),
+		 -1, 0, connect_dev_memleak_done, cmd);
 
-	/* This calls opening_memleak_done() async when all done. */
-	opening_dev_memleak(cmd);
+	return command_still_pending(cmd);
 }
 
 static const struct json_command dev_memleak_command = {

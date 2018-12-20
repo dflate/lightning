@@ -259,8 +259,8 @@ static void plugin_log_handle(struct plugin *plugin, const jsmntok_t *paramstok)
 		plugin_kill(plugin,
 			    "Unknown log-level %.*s, valid values are "
 			    "\"debug\", \"info\", \"warn\", or \"error\".",
-			    json_tok_len(leveltok),
-			    json_tok_contents(plugin->buffer, leveltok));
+			    json_tok_full_len(leveltok),
+			    json_tok_full(plugin->buffer, leveltok));
 		return;
 	}
 
@@ -293,8 +293,8 @@ static void plugin_notification_handle(struct plugin *plugin,
 		plugin_log_handle(plugin, paramstok);
 	} else {
 		plugin_kill(plugin, "Unknown notification method %.*s",
-			    json_tok_len(methtok),
-			    json_tok_contents(plugin->buffer, methtok));
+			    json_tok_full_len(methtok),
+			    json_tok_full(plugin->buffer, methtok));
 	}
 }
 
@@ -551,14 +551,12 @@ static bool plugin_opt_add(struct plugin *plugin, const char *buffer,
 			     buffer + nametok->start);
 	popt->value = NULL;
 	if (defaulttok) {
-		popt->value = tal_strndup(popt, buffer + defaulttok->start,
-					  defaulttok->end - defaulttok->start);
+		popt->value = json_strdup(popt, buffer, defaulttok);
 		popt->description = tal_fmt(
 		    popt, "%.*s (default: %s)", desctok->end - desctok->start,
 		    buffer + desctok->start, popt->value);
 	} else {
-		popt->description = tal_strndup(popt, buffer + desctok->start,
-						desctok->end - desctok->start);
+		popt->description = json_strdup(popt, buffer, desctok);
 	}
 
 	list_add_tail(&plugin->plugin_opts, &popt->list);
@@ -658,9 +656,10 @@ static struct plugin *find_plugin_for_command(struct command *cmd)
 	abort();
 }
 
-static void plugin_rpcmethod_dispatch(struct command *cmd, const char *buffer,
-				      const jsmntok_t *toks,
-				      const jsmntok_t *params UNNEEDED)
+static struct command_result *plugin_rpcmethod_dispatch(struct command *cmd,
+							const char *buffer,
+							const jsmntok_t *toks,
+							const jsmntok_t *params UNNEEDED)
 {
 	const jsmntok_t *idtok;
 	struct plugin *plugin;
@@ -670,7 +669,7 @@ static void plugin_rpcmethod_dispatch(struct command *cmd, const char *buffer,
 	if (cmd->mode == CMD_USAGE) {
 		/* FIXME! */
 		cmd->usage = "[params]";
-		return;
+		return command_param_failed();
 	}
 
 	plugin = find_plugin_for_command(cmd);
@@ -685,7 +684,7 @@ static void plugin_rpcmethod_dispatch(struct command *cmd, const char *buffer,
 	json_stream_forward_change_id(req->stream, buffer, toks, idtok, id);
 	plugin_request_queue(plugin, req);
 
-	command_still_pending(cmd);
+	return command_still_pending(cmd);
 }
 
 static bool plugin_rpcmethod_add(struct plugin *plugin,
@@ -722,14 +721,10 @@ static bool plugin_rpcmethod_add(struct plugin *plugin,
 	}
 
 	cmd = notleak(tal(plugin, struct json_command));
-	cmd->name = tal_strndup(cmd, buffer + nametok->start,
-				nametok->end - nametok->start);
-	cmd->description = tal_strndup(cmd, buffer + desctok->start,
-				       desctok->end - desctok->start);
+	cmd->name = json_strdup(cmd, buffer, nametok);
+	cmd->description = json_strdup(cmd, buffer, desctok);
 	if (longdesctok)
-		cmd->verbose =
-		    tal_strndup(cmd, buffer + longdesctok->start,
-				longdesctok->end - longdesctok->start);
+		cmd->verbose = json_strdup(cmd, buffer, longdesctok);
 	else
 		cmd->verbose = cmd->description;
 
@@ -848,7 +843,7 @@ char *add_plugin_dir(struct plugins *plugins, const char *dir, bool nonexist_ok)
 	if (!d) {
 		if (nonexist_ok && errno == ENOENT)
 			return NULL;
-		return tal_fmt("Failed to open plugin-dir %s: %s",
+		return tal_fmt(NULL, "Failed to open plugin-dir %s: %s",
 			       dir, strerror(errno));
 	}
 
@@ -899,6 +894,7 @@ void plugins_init(struct plugins *plugins, const char *dev_plugin_debug)
 	plugins->pending_manifests = 0;
 	uintmap_init(&plugins->pending_requests);
 
+	setenv("LIGHTNINGD_PLUGIN", "1", 1);
 	/* Spawn the plugin processes before entering the io_loop */
 	list_for_each(&plugins->plugins, p, list) {
 		bool debug;
