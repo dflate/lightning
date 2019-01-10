@@ -322,7 +322,7 @@ def test_sendpay(node_factory):
         'msatoshi': amt,
         'id': l2.info['id'],
         'delay': 5,
-        'channel': '1:1:1'
+        'channel': '1x1x1'
     }
 
     # Insufficient funds.
@@ -405,7 +405,7 @@ def test_sendpay(node_factory):
     # Overpaying by "only" a factor of 2 succeeds.
     rhash = l2.rpc.invoice(amt, 'testpayment3', 'desc')['payment_hash']
     assert only_one(l2.rpc.listinvoices('testpayment3')['invoices'])['status'] == 'unpaid'
-    routestep = {'msatoshi': amt * 2, 'id': l2.info['id'], 'delay': 5, 'channel': '1:1:1'}
+    routestep = {'msatoshi': amt * 2, 'id': l2.info['id'], 'delay': 5, 'channel': '1x1x1'}
     l1.rpc.sendpay([routestep], rhash)
     preimage3 = l1.rpc.waitsendpay(rhash)['payment_preimage']
     assert only_one(l2.rpc.listinvoices('testpayment3')['invoices'])['status'] == 'paid'
@@ -438,7 +438,7 @@ def test_sendpay_cant_afford(node_factory):
         if not label:
             label = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(20))
         rhash = ldst.rpc.invoice(amt, label, label)['payment_hash']
-        routestep = {'msatoshi': amt, 'id': ldst.info['id'], 'delay': 5, 'channel': '1:1:1'}
+        routestep = {'msatoshi': amt, 'id': ldst.info['id'], 'delay': 5, 'channel': '1x1x1'}
         lsrc.rpc.sendpay([routestep], rhash)
         lsrc.rpc.waitsendpay(rhash)
 
