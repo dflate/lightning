@@ -292,6 +292,13 @@ void log_add(struct log *log UNNEEDED, const char *fmt UNNEEDED, ...)
 void log_io(struct log *log UNNEEDED, enum log_level dir UNNEEDED, const char *comment UNNEEDED,
 	    const void *data UNNEEDED, size_t len UNNEEDED)
 { fprintf(stderr, "log_io called!\n"); abort(); }
+/* Generated stub for notify_connect */
+void notify_connect(struct lightningd *ld UNNEEDED, struct pubkey *nodeid UNNEEDED,
+		    struct wireaddr_internal *addr UNNEEDED)
+{ fprintf(stderr, "notify_connect called!\n"); abort(); }
+/* Generated stub for notify_disconnect */
+void notify_disconnect(struct lightningd *ld UNNEEDED, struct pubkey *nodeid UNNEEDED)
+{ fprintf(stderr, "notify_disconnect called!\n"); abort(); }
 /* Generated stub for null_response */
 struct json_stream *null_response(struct command *cmd UNNEEDED)
 { fprintf(stderr, "null_response called!\n"); abort(); }
@@ -360,11 +367,10 @@ struct command_result *param_tok(struct command *cmd UNNEEDED, const char *name 
 				 const jsmntok_t **out UNNEEDED)
 { fprintf(stderr, "param_tok called!\n"); abort(); }
 /* Generated stub for parse_onionpacket */
-struct onionpacket *parse_onionpacket(
-	const tal_t *ctx UNNEEDED,
-	const void *src UNNEEDED,
-	const size_t srclen
-	)
+struct onionpacket *parse_onionpacket(const tal_t *ctx UNNEEDED,
+				      const void *src UNNEEDED,
+				      const size_t srclen UNNEEDED,
+				      enum onion_type *why_bad UNNEEDED)
 { fprintf(stderr, "parse_onionpacket called!\n"); abort(); }
 /* Generated stub for payment_failed */
 void payment_failed(struct lightningd *ld UNNEEDED, const struct htlc_out *hout UNNEEDED,

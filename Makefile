@@ -1,6 +1,11 @@
 #! /usr/bin/make
 VERSION_NAME=Principled Opposition to SegWit
 VERSION=$(shell git describe --always --dirty=-modded --abbrev=7)
+
+ifeq ($(VERSION),)
+$(error "ERROR: git is required for generating version information")
+endif
+
 DISTRO=$(shell lsb_release -is 2>/dev/null || echo unknown)-$(shell lsb_release -rs 2>/dev/null || echo unknown)
 PKGNAME = c-lightning
 
@@ -35,7 +40,7 @@ endif
 
 ifeq ($(COMPAT),1)
 # We support compatibility with pre-0.6.
-COMPAT_CFLAGS=-DCOMPAT_V052=1 -DCOMPAT_V060=1 -DCOMPAT_V061=1
+COMPAT_CFLAGS=-DCOMPAT_V052=1 -DCOMPAT_V060=1 -DCOMPAT_V061=1 -DCOMPAT_V062=1
 endif
 
 # Timeout shortly before the 600 second travis silence timeout
@@ -188,9 +193,12 @@ endif
 
 default: all-programs all-test-programs
 
-config.vars ccan/config.h: configure ccan/tools/configurator/configurator.c
-	@if [ ! -f config.vars ]; then echo 'The 1990s are calling: use ./configure!' >&2; exit 1; fi
+ccan/config.h: config.vars configure ccan/tools/configurator/configurator.c
 	./configure --reconfigure
+
+config.vars:
+	@echo 'File config.vars not found: you must run ./configure before running make.' >&2
+	@exit 1
 
 include external/Makefile
 include bitcoin/Makefile

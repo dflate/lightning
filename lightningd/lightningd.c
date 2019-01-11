@@ -215,8 +215,9 @@ static struct lightningd *new_lightningd(const tal_t *ctx)
 	 *code. Here we initialize the context that will keep track and control
 	 *the plugins.
 	 */
+#ifdef PLUGINS
 	ld->plugins = plugins_new(ld, ld->log_book, ld->jsonrpc, ld);
-
+#endif
 	return ld;
 }
 
@@ -293,6 +294,10 @@ void test_subdaemons(const struct lightningd *ld)
 		    || verstring[strlen(version())] != '\n')
 			errx(1, "%s: bad version '%s'",
 			     subdaemons[i], verstring);
+
+		/*~ finally reap the child process, freeing all OS
+		 *  resources that go with it */
+		waitpid(pid, NULL, 0);
 	}
 }
 
@@ -357,10 +362,11 @@ static const char *find_my_pkglibexec_path(struct lightningd *ld,
 
 	/*~ The plugin dir is in ../libexec/c-lightning/plugins, which (unlike
 	 * those given on the command line) does not need to exist. */
+#ifdef PLUGINS
 	add_plugin_dir(ld->plugins,
 		       path_join(tmpctx, pkglibexecdir, "plugins"),
 		       true);
-
+#endif
 	/*~ Sometimes take() can be more efficient, since the routine can
 	 * manipulate the string in place.  This is the case here. */
 	return path_simplify(ld, take(pkglibexecdir));
@@ -373,9 +379,11 @@ static const char *find_daemon_dir(struct lightningd *ld, const char *argv0)
 	/* If we're running in-tree, all the subdaemons are with lightningd. */
 	if (has_all_subdaemons(my_path)) {
 		/* In this case, look in ../plugins */
+#ifdef PLUGINS
 		add_plugin_dir(ld->plugins,
 			       path_join(tmpctx, my_path, "../plugins"),
 			       true);
+#endif
 		return my_path;
 	}
 
@@ -574,6 +582,38 @@ void notify_new_block(struct lightningd *ld, u32 block_height)
 	channel_notify_new_block(ld, block_height);
 }
 
+static void on_sigint(int _ UNUSED)
+{
+        static const char *msg = "lightningd: SIGINT caught, exiting.\n";
+        write_all(STDERR_FILENO, msg, strlen(msg));
+        _exit(1);
+}
+
+static void on_sigterm(int _ UNUSED)
+{
+        static const char *msg = "lightningd: SIGTERM caught, exiting.\n";
+        write_all(STDERR_FILENO, msg, strlen(msg));
+        _exit(1);
+}
+
+/*~ We only need to handle SIGTERM and SIGINT for the case we are PID 1 of
+ * docker container since Linux makes special this PID and requires that
+ * some handler exist. */
+static void setup_sig_handlers(void)
+{
+	struct sigaction sigint, sigterm;
+	memset(&sigint, 0, sizeof(struct sigaction));
+	memset(&sigterm, 0, sizeof(struct sigaction));
+
+	sigint.sa_handler = on_sigint;
+	sigterm.sa_handler = on_sigterm;
+
+	if (1 == getpid()) {
+		sigaction(SIGINT, &sigint, NULL);
+		sigaction(SIGTERM, &sigterm, NULL);
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	struct lightningd *ld;
@@ -582,6 +622,8 @@ int main(int argc, char *argv[])
 
 	/*~ What happens in strange locales should stay there. */
 	setup_locale();
+
+	setup_sig_handlers();
 
 	/*~ This checks that the system-installed libraries (usually
 	 * dynamically linked) actually are compatible with the ones we
@@ -623,8 +665,9 @@ int main(int argc, char *argv[])
 	/*~ Initialize all the plugins we just registered, so they can
 	 *  do their thing and tell us about themselves (including
 	 *  options registration). */
+#ifdef PLUGINS
 	plugins_init(ld->plugins, ld->dev_debug_subprocess);
-
+#endif
 	/*~ Handle options and config; move to .lightningd (--lightning-dir) */
 	handle_opts(ld, argc, argv);
 
@@ -724,8 +767,9 @@ int main(int argc, char *argv[])
 
 	/*~ Now that the rpc path exists, we can start the plugins and they
 	 * can start talking to us. */
+#ifdef PLUGINS
 	plugins_config(ld->plugins);
-
+#endif
 	/*~ We defer --daemon until we've completed most initialization: that
 	 *  way we'll exit with an error rather than silently exiting 0, then
 	 *  realizing we can't start and forcing the confused user to read the

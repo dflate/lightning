@@ -38,6 +38,7 @@
 #include <lightningd/jsonrpc.h>
 #include <lightningd/log.h>
 #include <lightningd/memdump.h>
+#include <lightningd/notification.h>
 #include <lightningd/onchain_control.h>
 #include <lightningd/opening_control.h>
 #include <lightningd/options.h>
@@ -381,6 +382,7 @@ void channel_errmsg(struct channel *channel,
 
 	/* Make sure channel_fail_permanent doesn't tell connectd we died! */
 	channel->connected = false;
+	notify_disconnect(channel->peer->ld, &channel->peer->id);
 
 	/* BOLT #1:
 	 *
@@ -503,6 +505,8 @@ void peer_connected(struct lightningd *ld, const u8 *msg,
 		}
 		abort();
 	}
+
+	notify_connect(ld, &id, &addr);
 
 	/* No err, all good. */
 	error = NULL;
@@ -712,6 +716,8 @@ static void json_add_peer(struct lightningd *ld,
 		json_add_txid(response,
 			      "funding_txid",
 			      &channel->funding_txid);
+		json_add_bool(response, "private",
+				!(channel->channel_flags & CHANNEL_FLAGS_ANNOUNCE_CHANNEL));
 		json_add_u64(response, "msatoshi_to_us",
 			     channel->our_msatoshi);
 		json_add_u64(response, "msatoshi_to_us_min",
@@ -897,7 +903,8 @@ static struct command_result *json_close(struct command *cmd,
 {
 	const jsmntok_t *idtok;
 	struct peer *peer;
-	struct channel *channel;
+	/* FIXME: gcc 7.3.0 thinks this might not be initialized. */
+	struct channel *channel = NULL;
 	unsigned int *timeout;
 	bool *force;
 

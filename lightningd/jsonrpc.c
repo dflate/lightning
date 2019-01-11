@@ -12,7 +12,7 @@
  * done, the `json_connection` needs to drain it (if it's still around).  At
  * that point, the `json_connection` becomes the owner (or it's simply freed).
  */
-/* eg: { "method" : "dev-echo", "params" : [ "hello", "Arabella!" ], "id" : "1" } */
+/* eg: { "jsonrpc":"2.0", "method" : "dev-echo", "params" : [ "hello", "Arabella!" ], "id" : "1" } */
 #include <arpa/inet.h>
 #include <bitcoin/address.h>
 #include <bitcoin/base58.h>
@@ -1002,6 +1002,26 @@ static struct command_result *param_command(struct command *cmd,
 	return command_fail(cmd, JSONRPC2_METHOD_NOT_FOUND,
 			    "Unknown command '%.*s'",
 			    tok->end - tok->start, buffer + tok->start);
+}
+
+struct jsonrpc_notification *jsonrpc_notification_start(const tal_t *ctx, const char *method)
+{
+	struct jsonrpc_notification *n = tal(ctx, struct jsonrpc_notification);
+	n->method = tal_strdup(n, method);
+	n->stream = new_json_stream(n, NULL);
+	json_object_start(n->stream, NULL);
+	json_add_string(n->stream, "jsonrpc", "2.0");
+	json_add_string(n->stream, "method", method);
+	json_object_start(n->stream, "params");
+
+	return n;
+}
+
+void jsonrpc_notification_end(struct jsonrpc_notification *n)
+{
+	json_object_end(n->stream); /* closes '.params' */
+	json_object_end(n->stream); /* closes '.' */
+	json_stream_append(n->stream, "\n\n");
 }
 
 /* We add this destructor as a canary to detect cmd failing. */
