@@ -175,7 +175,7 @@ int main(void)
 
 	/* BOLT #11:
 	 *
-	 * > ### Please send $3 for a cup of coffee to the same peer, within 1 minute
+	 * > ### Please send $3 for a cup of coffee to the same peer, within one minute
 	 * > lngrs2500u1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdq5xysxxatsyp3k7enxv4jsxqzpuaztrnwngzn3kdzw5hydlzf03qdgm2hdq27cqv3agm2awhz5se903vruatfhq77w3ls4evs3ch9zw97j25emudupq63nyw24cg27h2rspfj9srp
 	 *
 	 * Breakdown:
@@ -190,7 +190,7 @@ int main(void)
 	 *   * `xysxxatsyp3k7enxv4js`: '1 cup coffee'
 	 * * `x`: expiry time
 	 *   * `qz`: `data_length` (`q` = 0, `z` = 2; 0 * 32 + 2 == 2)
-	 *   * `pu`: 60 seconds (`p` = 1, `u` = 28;  1 * 32 + 28 == 60)
+	 *   * `pu`: 60 seconds (`p` = 1, `u` = 28; 1 * 32 + 28 == 60)
 	 * * `aztrnwngzn3kdzw5hydlzf03qdgm2hdq27cqv3agm2awhz5se903vruatfhq77w3ls4evs3ch9zw97j25emudupq63nyw24cg27h2rsp`: signature
 	 * * `fj9srp`: Bech32 checksum
 	 */
