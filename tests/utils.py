@@ -38,7 +38,7 @@ with open('config.vars') as configfile:
 
 DEVELOPER = os.getenv("DEVELOPER", config['DEVELOPER']) == "1"
 EXPERIMENTAL_FEATURES = os.getenv("EXPERIMENTAL_FEATURES", config['EXPERIMENTAL_FEATURES']) == "1"
-TIMEOUT = int(os.getenv("TIMEOUT", "60"))
+TIMEOUT = int(os.getenv("TIMEOUT", "120"))
 VALGRIND = os.getenv("VALGRIND", config['VALGRIND']) == "1"
 SLOW_MACHINE = os.getenv("SLOW_MACHINE", "0") == "1"
 
@@ -283,7 +283,7 @@ class BitcoinD(TailableProc):
             os.makedirs(regtestdir)
 
         self.cmd_line = [
-            'bitcoind',
+            'groestlcoind',
             '-datadir={}'.format(bitcoin_dir),
             '-printtoconsole',
             '-server',
@@ -295,7 +295,7 @@ class BitcoinD(TailableProc):
         # For after 0.16.1 (eg. 3f398d7a17f136cd4a67998406ca41a124ae2966), this
         # needs its own [regtest] section.
         BITCOIND_REGTEST = {'rpcport': rpcport}
-        btc_conf_file = os.path.join(bitcoin_dir, 'bitcoin.conf')
+        btc_conf_file = os.path.join(bitcoin_dir, 'groestlcoin.conf')
         write_config(btc_conf_file, BITCOIND_CONFIG, BITCOIND_REGTEST)
         self.rpc = SimpleBitcoinProxy(btc_conf_file=btc_conf_file)
 
@@ -303,7 +303,7 @@ class BitcoinD(TailableProc):
         TailableProc.start(self)
         self.wait_for_log("Done loading", timeout=TIMEOUT)
 
-        logging.info("BitcoinD started")
+        logging.info("GroestlcoinD started")
 
     def generate_block(self, numblocks=1):
         # As of 0.16, generate() is removed; use generatetoaddress.
@@ -418,7 +418,7 @@ class LightningNode(object):
             self.bitcoin.generate_block(1)
 
         if wait_for_announce:
-            self.bitcoin.generate_block(5)
+            self.bitcoin.generate_block(6)
 
         if confirm or wait_for_announce:
             self.daemon.wait_for_log(
@@ -632,7 +632,7 @@ class LightningNode(object):
     # Note: this feeds through the smoother in update_feerate, so changing
     # it on a running daemon may not give expected result!
     def set_feerates(self, feerates, wait_for_effect=True):
-        # (bitcoind returns bitcoin per kb, so these are * 4)
+        # (groestlcoind returns groestlcoin per kb, so these are * 4)
 
         def mock_estimatesmartfee(r):
             params = r['params']
@@ -783,7 +783,7 @@ class NodeFactory(object):
                 'valgrind',
                 '-q',
                 '--trace-children=yes',
-                '--trace-children-skip=*python*,*bitcoin-cli*',
+                '--trace-children-skip=*python*,*groestlcoin-cli*',
                 '--error-exitcode=7',
                 '--log-file={}/valgrind-errors.%p'.format(node.daemon.lightning_dir)
             ]
@@ -833,6 +833,8 @@ class NodeFactory(object):
             scid = src.get_channel_scid(dst)
             src.daemon.wait_for_log(r'Received channel_update for channel {scid}/. now ACTIVE'.format(scid=scid))
             scids.append(scid)
+
+        bitcoin.generate_block(1)
 
         if not wait_for_announce:
             return nodes

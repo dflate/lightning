@@ -344,7 +344,7 @@ def test_bech32_funding(node_factory):
     # fund a bech32 address and then open a channel with it
     res = l1.openchannel(l2, 20000, 'bech32')
     address = res['address']
-    assert address[0:4] == "bcrt"
+    assert address[0:4] == "grsrt"
 
     # probably overly paranoid checking
     wallettxid = res['wallettxid']
@@ -390,7 +390,7 @@ def test_withdraw(node_factory, bitcoind):
 
     out = l1.rpc.withdraw(waddr, 2 * amount)
 
-    # Make sure bitcoind received the withdrawal
+    # Make sure groestlcoind received the withdrawal
     unspent = l1.bitcoin.rpc.listunspent(0)
     withdrawal = [u for u in unspent if u['txid'] == out['txid']]
 
@@ -414,28 +414,28 @@ def test_withdraw(node_factory, bitcoind):
     assert l1.db_query('SELECT COUNT(*) as c FROM outputs WHERE status=2')[0]['c'] == 4
 
     # Simple test for withdrawal to P2WPKH
-    # Address from: https://bc-2.jp/tools/bech32demo/index.html
-    waddr = 'bcrt1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080'
+
+    waddr = 'grsrt1qccn808860ygrqq98e6ltplxu8hvjk08ngwkdpr'
     with pytest.raises(RpcError):
-        l1.rpc.withdraw('xx1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx', 2 * amount)
+        l1.rpc.withdraw('xx1qccn808860ygrqq98e6ltplxu8hvjk08ngwkdpr', 2 * amount)
     with pytest.raises(RpcError):
-        l1.rpc.withdraw('tb1pw508d6qejxtdg4y5r3zarvary0c5xw7kdl9fad', 2 * amount)
+        l1.rpc.withdraw('tgrs1pcn808860ygrqq98e6ltplxu8hvjk08ngwkdpr', 2 * amount)
     with pytest.raises(RpcError):
-        l1.rpc.withdraw('tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxxxxxx', 2 * amount)
+        l1.rpc.withdraw('tgrs1qccn808860ygrqq98e6ltplxu8hvjk08nxxxxxx', 2 * amount)
     l1.rpc.withdraw(waddr, 2 * amount)
     bitcoind.generate_block(1)
     # Now make sure additional two of them were marked as spent
     assert l1.db_query('SELECT COUNT(*) as c FROM outputs WHERE status=2')[0]['c'] == 6
 
     # Simple test for withdrawal to P2WSH
-    # Address from: https://bc-2.jp/tools/bech32demo/index.html
-    waddr = 'bcrt1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qzf4jry'
+    # FIXME GENERATE REAL P2WSH ADDR
+    waddr = 'grsrt1qpc4mnd3zfzjnyyyxj97yxcastjh7cx7m3ex6pn33quse9qleqsjsnakslv'
     with pytest.raises(RpcError):
-        l1.rpc.withdraw('xx1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3q0sl5k7', 2 * amount)
+        l1.rpc.withdraw('xx1qpc4mnd3zfzjnyyyxj97yxcastjh7cx7m3ex6pn33quse9qleqsjsnakslv', 2 * amount)
     with pytest.raises(RpcError):
-        l1.rpc.withdraw('tb1prp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qsm03tq', 2 * amount)
+        l1.rpc.withdraw('tgrs1ppc4mnd3zfzjnyyyxj97yxcastjh7cx7m3ex6pn33quse9qleqsjsnakslv', 2 * amount)
     with pytest.raises(RpcError):
-        l1.rpc.withdraw('tb1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3qxxxxxx', 2 * amount)
+        l1.rpc.withdraw('tgrs1qpc4mnd3zfzjnyyyxj97yxcastjh7cx7m3ex6pn33quse9qleqsjsxxxxxx', 2 * amount)
     l1.rpc.withdraw(waddr, 2 * amount)
     bitcoind.generate_block(1)
     # Now make sure additional two of them were marked as spent
@@ -456,16 +456,16 @@ def test_withdraw(node_factory, bitcoind):
         l1.rpc.withdraw('1pzry9x0s0muk', 2 * amount)
     # Invalid witness version
     with pytest.raises(RpcError):
-        l1.rpc.withdraw('BC13W508D6QEJXTDG4Y5R3ZARVARY0C5XW7KN40WF2', 2 * amount)
+        l1.rpc.withdraw('GRS13W508D6QEJXTDG4Y5R3ZARVARY0C5XW7KN40WF2', 2 * amount)
     # Invalid program length for witness version 0 (per BIP141)
     with pytest.raises(RpcError):
-        l1.rpc.withdraw('BC1QR508D6QEJXTDG4Y5R3ZARVARYV98GJ9P', 2 * amount)
+        l1.rpc.withdraw('GRS1QR508D6QEJXTDG4Y5R3ZARVARYV98GJ9P', 2 * amount)
     # Mixed case
     with pytest.raises(RpcError):
-        l1.rpc.withdraw('tb1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3q0sL5k7', 2 * amount)
+        l1.rpc.withdraw('tgrs1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3q0sL5k7', 2 * amount)
     # Non-zero padding in 8-to-5 conversion
     with pytest.raises(RpcError):
-        l1.rpc.withdraw('tb1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3pjxtptv', 2 * amount)
+        l1.rpc.withdraw('tgrs1qrp33g0q5c5txsp9arysrx4k6zdkfs4nce4xj0gdcccefvpysxf3pjxtptv', 2 * amount)
 
     # Should have 6 outputs available.
     assert l1.db_query('SELECT COUNT(*) as c FROM outputs WHERE status=0')[0]['c'] == 6
@@ -486,7 +486,7 @@ def test_withdraw(node_factory, bitcoind):
 def test_addfunds_from_block(node_factory, bitcoind):
     """Send funds to the daemon without telling it explicitly
     """
-    # Previous runs with same bitcoind can leave funds!
+    # Previous runs with same groestlcoind can leave funds!
     l1 = node_factory.get_node(random_hsm=True)
 
     addr = l1.rpc.newaddr()['address']
@@ -822,22 +822,22 @@ def test_rescan(node_factory, bitcoind):
     """
     l1 = node_factory.get_node()
 
-    # The first start should start at current_height - 30 = 71, make sure
+    # The first start should start at current_height - 60 = 61, make sure
     # it's not earlier
-    l1.daemon.wait_for_log(r'Adding block 101')
-    assert not l1.daemon.is_in_log(r'Adding block 70')
+    l1.daemon.wait_for_log(r'Adding block 121')
+    assert not l1.daemon.is_in_log(r'Adding block 60')
 
     # Restarting with a higher rescan should go back further
     l1.daemon.opts['rescan'] = 50
     l1.restart()
-    l1.daemon.wait_for_log(r'Adding block 101')
-    assert l1.daemon.is_in_log(r'Adding block 51')
-    assert not l1.daemon.is_in_log(r'Adding block 50')
+    l1.daemon.wait_for_log(r'Adding block 121')
+    assert l1.daemon.is_in_log(r'Adding block 71')
+    assert not l1.daemon.is_in_log(r'Adding block 70')
 
     # Restarting with an absolute rescan should start from there
     l1.daemon.opts['rescan'] = -31
     l1.restart()
-    l1.daemon.wait_for_log(r'Adding block 101')
+    l1.daemon.wait_for_log(r'Adding block 121')
     assert l1.daemon.is_in_log(r'Adding block 31')
     assert not l1.daemon.is_in_log(r'Adding block 30')
 
@@ -847,8 +847,8 @@ def test_rescan(node_factory, bitcoind):
     l1.stop()
     bitcoind.generate_block(4)
     l1.start()
-    l1.daemon.wait_for_log(r'Adding block 105')
-    assert not l1.daemon.is_in_log(r'Adding block 102')
+    l1.daemon.wait_for_log(r'Adding block 125')
+    assert not l1.daemon.is_in_log(r'Adding block 122')
 
 
 @flaky
@@ -970,14 +970,14 @@ def test_feerates(node_factory):
     # Query feerates (shouldn't give any!)
     wait_for(lambda: len(l1.rpc.feerates('perkw')['perkw']) == 2)
     feerates = l1.rpc.feerates('perkw')
-    assert feerates['warning'] == 'Some fee estimates unavailable: bitcoind startup?'
+    assert feerates['warning'] == 'Some fee estimates unavailable: groestlcoind startup?'
     assert 'perkb' not in feerates
     assert feerates['perkw']['max_acceptable'] == 2**32 - 1
     assert feerates['perkw']['min_acceptable'] == 253
 
     wait_for(lambda: len(l1.rpc.feerates('perkb')['perkb']) == 2)
     feerates = l1.rpc.feerates('perkb')
-    assert feerates['warning'] == 'Some fee estimates unavailable: bitcoind startup?'
+    assert feerates['warning'] == 'Some fee estimates unavailable: groestlcoind startup?'
     assert 'perkw' not in feerates
     assert feerates['perkb']['max_acceptable'] == (2**32 - 1)
     assert feerates['perkb']['min_acceptable'] == 253 * 4
@@ -987,7 +987,7 @@ def test_feerates(node_factory):
     wait_for(lambda: len(l1.rpc.feerates('perkw')['perkw']) == 3)
     feerates = l1.rpc.feerates('perkw')
     assert feerates['perkw']['urgent'] == 15000
-    assert feerates['warning'] == 'Some fee estimates unavailable: bitcoind startup?'
+    assert feerates['warning'] == 'Some fee estimates unavailable: groestlcoind startup?'
     assert 'perkb' not in feerates
     assert feerates['perkw']['max_acceptable'] == 15000 * 10
     assert feerates['perkw']['min_acceptable'] == 253
@@ -997,7 +997,7 @@ def test_feerates(node_factory):
     feerates = l1.rpc.feerates('perkb')
     assert feerates['perkb']['urgent'] == 15000 * 4
     assert feerates['perkb']['normal'] == 25000
-    assert feerates['warning'] == 'Some fee estimates unavailable: bitcoind startup?'
+    assert feerates['warning'] == 'Some fee estimates unavailable: groestlcoind startup?'
     assert 'perkw' not in feerates
     assert feerates['perkb']['max_acceptable'] == 15000 * 4 * 10
     assert feerates['perkb']['min_acceptable'] == 253 * 4

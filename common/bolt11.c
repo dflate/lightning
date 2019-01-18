@@ -22,7 +22,7 @@
 #include <wire/wire.h>
 #include <wire/wire_sync.h>
 
-/* 1000 * 10^8 millisatoshi == 1 bitcoin */
+/* 1000 * 10^8 millisatoshi == 1 groestlcoin */
 #define MSAT_PER_BTC 100000000000ULL
 
 struct multiplier {
@@ -326,7 +326,7 @@ static char *decode_f(struct bolt11 *b11,
 
         /* BOLT #11:
          *
-	 * for Bitcoin payments... MUST set an `f` field to a valid
+         * For groestlcoin payments, a writer MUST set an `f` field to a
 	 * witness version and program, OR to `17` followed by a
 	 * public key hash, OR to `18` followed by a script hash.
 	*/
@@ -495,7 +495,8 @@ struct bolt11 *bolt11_decode(const tal_t *ctx, const char *str,
          *
 	 * The human-readable part of a Lightning invoice consists of two sections:
 	 * 1. `prefix`: `ln` + BIP-0173 currency prefix (e.g. `lnbc` for Bitcoin mainnet,
-	 *    `lntb` for Bitcoin testnet, and `lnbcrt` for Bitcoin regtest)
+	 * 1. `prefix`: `ln` + BIP-0173 currency prefix (e.g. `lngrs` for groestlcoin
+	 *     mainnet, `lntgrs` for groestlcoin testnet and `lngrsrt` for groestlcoin
 	 * 1. `amount`: optional number in that currency, followed by an optional
 	 *    `multiplier` letter. The unit encoded here is the 'social' convention of a payment unit -- in the case of Bitcoin the unit is 'bitcoin' NOT satoshis.
 	*/
@@ -813,7 +814,7 @@ static void encode_f(u5 **data, const u8 *fallback)
 
         /* BOLT #11:
          *
-	 * for Bitcoin payments... MUST set an `f` field to a valid
+         * For groestlcoin payments, a writer MUST set an `f` field to a valid
 	 * witness version and program, OR to `17` followed by a
 	 * public key hash, OR to `18` followed by a script hash.
          */

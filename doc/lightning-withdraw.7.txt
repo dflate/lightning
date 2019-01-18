@@ -4,24 +4,24 @@ LIGHTNING-WITHDRAW(7)
 
 NAME
 ----
-lightning-withdraw - Command for withdrawing funds from the 
+lightning-withdraw - Command for withdrawing funds from the
 internal wallet.
 
 SYNOPSIS
 --------
-*withdraw* 'destination' 'satoshi' ['feerate']
+*withdraw* 'destination' 'gro' ['feerate']
 
 DESCRIPTION
 -----------
-The *withdraw* RPC command sends funds from c-lightning's 
+The *withdraw* RPC command sends funds from c-lightning's
 internal wallet to the address specified in 'destination'.
 
-The address can be of any Bitcoin accepted type, 
+The address can be of any Groestlcoin accepted type,
 including bech32.
 
-'satoshi' is the amount to be withdrawn from the internal 
-wallet (expressed, as name suggests, in satoshi). 
-The string 'all' can be used to specify withdrawal of all 
+'gro' is the amount to be withdrawn from the internal
+wallet (expressed, as name suggests, in gro).
+The string 'all' can be used to specify withdrawal of all
 available funds.
 
 'feerate' is an optional feerate to use.  It can be one of the strings
@@ -30,13 +30,13 @@ available funds.
 
 Otherwise, 'feerate' is a number, with an optional suffix:
 'perkw' means the number is interpreted as satoshi-per-kilosipa
-(weight), and 'perkb' means it is interpreted bitcoind-style as
-satoshi-per-kilobyte.  Omitting the suffix is equivalent to 'perkb'.
+(weight), and 'perkb' means it is interpreted groestlcoind-style as
+gro-per-kilobyte.  Omitting the suffix is equivalent to 'perkb'.
 
 RETURN VALUE
 ------------
-On success, an object with attributes 'tx' and 'txid' will 
-be returned. 
+On success, an object with attributes 'tx' and 'txid' will
+be returned.
 
 'tx' represents the raw bitcoin, fully signed, transaction
 and 'txid' represent the bitcoin transaction id.

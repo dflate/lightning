@@ -805,7 +805,7 @@ static void json_add_peer(struct lightningd *ld,
 			     channel_stats.in_msatoshi_offered);
 		json_add_u64(response, "in_payments_fulfilled",
 			     channel_stats.in_payments_fulfilled);
-		json_add_u64(response, "in_msatoshi_fulfilled",
+		json_add_u64(response, "in_msatoshi_offered_fulfilled",
 			     channel_stats.in_msatoshi_fulfilled);
 		json_add_u64(response, "out_payments_offered",
 			     channel_stats.out_payments_offered);
@@ -813,7 +813,7 @@ static void json_add_peer(struct lightningd *ld,
 			     channel_stats.out_msatoshi_offered);
 		json_add_u64(response, "out_payments_fulfilled",
 			     channel_stats.out_payments_fulfilled);
-		json_add_u64(response, "out_msatoshi_fulfilled",
+		json_add_u64(response, "out_msatoshi_offered_fulfilled",
 			     channel_stats.out_msatoshi_fulfilled);
 
 		json_add_htlcs(ld, response, channel);
@@ -1522,4 +1522,3 @@ void peer_dev_memleak(struct command *cmd)
 	peer_memleak_req_next(cmd, NULL);
 }
 #endif /* DEVELOPER */
-

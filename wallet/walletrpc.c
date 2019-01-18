@@ -170,7 +170,7 @@ static struct command_result *json_withdraw(struct command *cmd,
 static const struct json_command withdraw_command = {
 	"withdraw",
 	json_withdraw,
-	"Send to {destination} address {satoshi} (or 'all') amount via Bitcoin transaction, at optional {feerate}",
+	"Send to {destination} address {satoshi} (or 'all') amount via Groestlcoin transaction, at optional {feerate}",
 	false, "Send funds from the internal wallet to the specified address. Either specify a number of satoshis to send or 'all' to sweep all funds in the internal wallet to the address."
 };
 AUTODATA(json_command, &withdraw_command);
@@ -543,8 +543,8 @@ static struct command_result *json_dev_rescan_outputs(struct command *cmd,
 static const struct json_command dev_rescan_output_command = {
 	"dev-rescan-outputs",
 	json_dev_rescan_outputs,
-	"Synchronize the state of our funds with bitcoind",
+	"Synchronize the state of our funds with groestlcoind",
 	false,
-	"For each output stored in the internal wallet ask `bitcoind` whether we are in sync with its state (spent vs. unspent)"
+	"For each output stored in the internal wallet ask `groestlcoind` whether we are in sync with its state (spent vs. unspent)"
 };
 AUTODATA(json_command, &dev_rescan_output_command);

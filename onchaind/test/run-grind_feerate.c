@@ -105,8 +105,8 @@ void subdaemon_setup(int argc UNNEEDED, char *argv[])
 { fprintf(stderr, "subdaemon_setup called!\n"); abort(); }
 /* Generated stub for to_self_wscript */
 u8 *to_self_wscript(const tal_t *ctx UNNEEDED,
-		    u16 to_self_delay UNNEEDED,
-		    const struct keyset *keyset UNNEEDED)
+			u16 to_self_delay UNNEEDED,
+			const struct keyset *keyset UNNEEDED)
 { fprintf(stderr, "to_self_wscript called!\n"); abort(); }
 /* Generated stub for towire_hsm_get_per_commitment_point */
 u8 *towire_hsm_get_per_commitment_point(const tal_t *ctx UNNEEDED, u64 n UNNEEDED)
@@ -204,30 +204,33 @@ int main(int argc, char *argv[])
 	if (!signature_from_der(der, tal_count(der), &sig))
 		abort();
 
-	wscript = tal_hexdata(tmpctx, "76a914a8c40c334351dbe8e5908544f1c98fbcfb8719fc8763ac6721038ffd2621647812011960152bfb79c5a2787dfe6c4f37e2222547de054432eb7f7c820120876475527c2103cf8e2f193a6aed60db80af75f3c8d59c2de735b299b7c7083527be9bd23b77a852ae67a914b8bcd51efa35be1e50ae2d5f72f4500acb005c9c88ac6868", strlen("76a914a8c40c334351dbe8e5908544f1c98fbcfb8719fc8763ac6721038ffd2621647812011960152bfb79c5a2787dfe6c4f37e2222547de054432eb7f7c820120876475527c2103cf8e2f193a6aed60db80af75f3c8d59c2de735b299b7c7083527be9bd23b77a852ae67a914b8bcd51efa35be1e50ae2d5f72f4500acb005c9c88ac6868"));
-	if (!pubkey_from_hexstr("038ffd2621647812011960152bfb79c5a2787dfe6c4f37e2222547de054432eb7f",
-				strlen("038ffd2621647812011960152bfb79c5a2787dfe6c4f37e2222547de054432eb7f"),
-				&htlc_key))
-		abort();
+	wscript = tal_hexdata(tmpctx, "76a9142a85f084bb57555fd20c30dbfb96106fa9b972838763ac67210232974d5858c34a8a69c7b708857a72717daca1bcc312904b5a3ef5304ea5ca8f7c8201208763a9148ddc0fc0ec8c58afab6bb7475f84be60e8e754d488527c21036879c3877d39229bf960b60a11c73560aa8dbd2439b8560c08964385bac79a1352ae6775020a01b175ac6868",strlen("76a9142a85f084bb57555fd20c30dbfb96106fa9b972838763ac67210232974d5858c34a8a69c7b708857a72717daca1bcc312904b5a3ef5304ea5ca8f7c8201208763a9148ddc0fc0ec8c58afab6bb7475f84be60e8e754d488527c21036879c3877d39229bf960b60a11c73560aa8dbd2439b8560c08964385bac79a1352ae6775020a01b175ac6868"));
 
+	if (!pubkey_from_hexstr("0232974d5858c34a8a69c7b708857a72717daca1bcc312904b5a3ef5304ea5ca8f",
+				strlen("0232974d5858c34a8a69c7b708857a72717daca1bcc312904b5a3ef5304ea5ca8f"),
+				&htlc_key))
+		 abort();
 	/* Dance around a little because keyset is const */
 	keys = tal(tmpctx, struct keyset);
 	keys->other_htlc_key = htlc_key;
 	keyset = keys;
 
+
 	if (argc > 1)
 		iterations = atoi(argv[1]);
-	max_possible_feerate = 250000;
+	max_possible_feerate = 2000;
 	min_possible_feerate = max_possible_feerate + 1 - iterations;
 
 	start = time_now();
+
 	fee = grind_htlc_tx_fee(tx, &sig, wscript, 663);
 	end = time_now();
-	assert(fee == 165750);
+
+	assert(fee == 703);
 	printf("%u iterations in %"PRIu64" msec = %"PRIu64" nsec each\n",
-	       iterations,
-	       time_to_msec(time_between(end, start)),
-	       time_to_nsec(time_divide(time_between(end, start), iterations)));
+		   iterations,
+		   time_to_msec(time_between(end, start)),
+		   time_to_nsec(time_divide(time_between(end, start), iterations)));
 
 	tal_free(tmpctx);
 	secp256k1_context_destroy(secp256k1_ctx);

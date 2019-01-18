@@ -1,4 +1,4 @@
-/* Code for talking to bitcoind.  We use bitcoin-cli. */
+/* Code for talking to groestlcoind.  We use groestlcoin-cli. */
 #include "bitcoin/base58.h"
 #include "bitcoin/block.h"
 #include "bitcoin/feerate.h"
@@ -22,7 +22,7 @@
 #include <inttypes.h>
 #include <lightningd/chaintopology.h>
 
-/* Bitcoind's web server has a default of 4 threads, with queue depth 16.
+/* Groestlcoind's web server has a default of 4 threads, with queue depth 16.
  * It will *fail* rather than queue beyond that, so we must not stress it!
  *
  * This is how many request for each priority level we have.
@@ -170,7 +170,7 @@ static void bcli_finished(struct io_conn *conn UNUSED, struct bitcoin_cli *bcli)
 	/* If it took over 10 seconds, that's rather strange. */
 	if (msec > 10000)
 		log_unusual(bitcoind->log,
-			    "bitcoin-cli: finished %s (%"PRIu64" ms)",
+			    "groestlcoin-cli: finished %s (%"PRIu64" ms)",
 			    bcli_args(tmpctx, bcli), msec);
 
 	assert(bitcoind->num_requests[prio] > 0);
@@ -238,7 +238,7 @@ static void next_bcli(struct bitcoind *bitcoind, enum bitcoind_prio prio)
 
 	bitcoind->num_requests[prio]++;
 
-	/* This lifetime is attached to bitcoind command fd */
+	/* This lifetime is attached to groestlcoind command fd */
 	conn = notleak(io_new_conn(bitcoind, bcli->fd, output_init, bcli));
 	io_set_finish(conn, bcli_finished, bcli);
 }
@@ -369,7 +369,7 @@ static bool process_estimatefee(struct bitcoin_cli *bcli)
 			efee->satoshi_per_kw[efee->i] = 0;
 #endif
 	} else
-		/* Rate in satoshi per kw. */
+		/* Rate in gro per kw. */
 		efee->satoshi_per_kw[efee->i]
 			= feerate_from_style(feerate, FEERATE_PER_KBYTE);
 
@@ -532,7 +532,7 @@ static bool process_gettxout(struct bitcoin_cli *bcli)
 	struct bitcoin_tx_output out;
 	bool valid;
 
-	/* As of at least v0.15.1.0, bitcoind returns "success" but an empty
+	/* As of at least v2.16.0, groestlcoind returns "success" but an empty
 	   string on a spent gettxout */
 	if (*bcli->exitstatus != 0 || bcli->output_bytes == 0) {
 		log_debug(bcli->bitcoind->log, "%s: not unspent output?",
@@ -586,7 +586,7 @@ static bool process_gettxout(struct bitcoin_cli *bcli)
 }
 
 /**
- * process_getblock -- Retrieve a block from bitcoind
+ * process_getblock -- Retrieve a block from groestlcoind
  *
  * Used to resolve a `txoutput` after identifying the blockhash, and
  * before extracting the outpoint from the UTXO.
@@ -696,7 +696,7 @@ void bitcoind_getoutput_(struct bitcoind *bitcoind,
 	go->outnum = outnum;
 	go->cbarg = arg;
 
-	/* We may not have topology ourselves that far back, so ask bitcoind */
+	/* We may not have topology ourselves that far back, so ask groestlcoind */
 	start_bitcoin_cli(bitcoind, NULL, process_getblockhash_for_txout,
 			  true, BITCOIND_LOW_PRIO, cb, go,
 			  "getblockhash", take(tal_fmt(NULL, "%u", blocknum)),
@@ -789,8 +789,8 @@ static void fatal_bitcoind_failure(struct bitcoind *bitcoind, const char *error_
 	const char **cmd = cmdarr(bitcoind, bitcoind, "echo", NULL);
 
 	fprintf(stderr, "%s\n\n", error_message);
-	fprintf(stderr, "Make sure you have bitcoind running and that bitcoin-cli is able to connect to bitcoind.\n\n");
-	fprintf(stderr, "You can verify that your Bitcoin Core installation is ready for use by running:\n\n");
+	fprintf(stderr, "Make sure you have groestlcoind running and that groestlcoin-cli is able to connect to groestlcoind.\n\n");
+	fprintf(stderr, "You can verify that your Groestlcoin Core installation is ready for use by running:\n\n");
 	fprintf(stderr, "    $ ");
 	for (i = 0; cmd[i]; i++) {
 		fprintf(stderr, "%s ", cmd[i]);
@@ -811,7 +811,7 @@ void wait_for_bitcoind(struct bitcoind *bitcoind)
 		child = pipecmdarr(NULL, &from, &from, cast_const2(char **,cmd));
 		if (child < 0) {
 			if (errno == ENOENT) {
-				fatal_bitcoind_failure(bitcoind, "bitcoin-cli not found. Is bitcoin-cli (part of Bitcoin Core) available in your PATH?");
+				fatal_bitcoind_failure(bitcoind, "groestlcoin-cli not found. Is groestlcoin-cli (part of Groestlcoin Core) available in your PATH?");
 			}
 			fatal("%s exec failed: %s", cmd[0], strerror(errno));
 		}
@@ -836,7 +836,7 @@ void wait_for_bitcoind(struct bitcoind *bitcoind)
 		 */
 		if (WEXITSTATUS(status) != 28) {
 			if (WEXITSTATUS(status) == 1) {
-				fatal_bitcoind_failure(bitcoind, "Could not connect to bitcoind using bitcoin-cli. Is bitcoind running?");
+				fatal_bitcoind_failure(bitcoind, "Could not connect to groestlcoind using groestlcoin-cli. Is groestlcoind running?");
 			}
 			fatal("%s exited with code %i: %s",
 			      cmd[0], WEXITSTATUS(status), output);
@@ -844,7 +844,7 @@ void wait_for_bitcoind(struct bitcoind *bitcoind)
 
 		if (!printed) {
 			log_unusual(bitcoind->log,
-				    "Waiting for bitcoind to warm up...");
+				    "Waiting for groestlcoind to warm up...");
 			printed = true;
 		}
 		sleep(1);

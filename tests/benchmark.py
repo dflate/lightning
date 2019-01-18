@@ -6,10 +6,11 @@ from tqdm import tqdm
 
 import pytest
 import random
+import time 
 
 
-num_workers = 480
-num_payments = 10000
+num_workers = 10
+num_payments = 100
 
 
 @pytest.fixture
@@ -20,11 +21,8 @@ def executor():
 
 
 def test_single_hop(node_factory, executor):
-    l1 = node_factory.get_node()
-    l2 = node_factory.get_node()
-
-    l1.rpc.connect(l2.rpc.getinfo()['id'], 'localhost:%d' % l2.port)
-    l1.openchannel(l2, 4000000)
+    l1, l2 = node_factory.line_graph(2, fundchannel=True)
+    route = l1.rpc.getroute(l2.info['id'], 1000, 1 , 9 , l1.info['id'], 10)['route']
 
     print("Collecting invoices")
     fs = []
@@ -32,12 +30,12 @@ def test_single_hop(node_factory, executor):
     for i in tqdm(range(num_payments)):
         invoices.append(l2.rpc.invoice(1000, 'invoice-%d' % (i), 'desc')['payment_hash'])
 
-    route = l1.rpc.getroute(l2.rpc.getinfo()['id'], 1000, 1)['route']
     print("Sending payments")
-    start_time = time()
+    start_time = time.time()
 
     def do_pay(i):
         p = l1.rpc.sendpay(route, i)
+        filler_time = time.time()
         r = l1.rpc.waitsendpay(p['payment_hash'])
         return r
 
@@ -47,7 +45,7 @@ def test_single_hop(node_factory, executor):
     for f in tqdm(futures.as_completed(fs), total=len(fs)):
         f.result()
 
-    diff = time() - start_time
+    diff = time.time() - start_time
     print("Done. %d payments performed in %f seconds (%f payments per second)" % (num_payments, diff, num_payments / diff))
 
 
@@ -85,7 +83,7 @@ def test_invoice(node_factory, benchmark):
     l1 = node_factory.get_node()
 
     def bench_invoice():
-        l1.rpc.invoice(1000, 'invoice-{}'.format(time()), 'desc')
+        l1.rpc.invoice(1000, 'invoice-{}'.format(time.time()), 'desc')['bolt11']
 
     benchmark(bench_invoice)
 
@@ -94,7 +92,7 @@ def test_pay(node_factory, benchmark):
     l1, l2 = node_factory.line_graph(2)
 
     invoices = []
-    for _ in range(1, 100):
+    for _ in range(1, num_payments):
         invoice = l2.rpc.invoice(1000, 'invoice-{}'.format(random.random()), 'desc')['bolt11']
         invoices.append(invoice)
 
@@ -102,6 +100,7 @@ def test_pay(node_factory, benchmark):
         l1.rpc.pay(invoices.pop())
 
     benchmark(do_pay, l1, l2)
+
 
 
 def test_start(node_factory, benchmark):

@@ -10,6 +10,7 @@ import time
 import random
 import shutil
 import unittest
+import time
 
 
 def test_connect(node_factory):
@@ -534,7 +535,7 @@ def test_shutdown_awaiting_lockin(node_factory, bitcoind):
 
     # Technically, this is async to fundchannel.
     l1.daemon.wait_for_log('sendrawtx exit 0')
-    bitcoind.generate_block(1)
+    bitcoind.generate_block(10)
 
     # This should return with an error, then close.
     with pytest.raises(RpcError, match=r'Channel close negotiation not finished'):
@@ -556,7 +557,16 @@ def test_shutdown_awaiting_lockin(node_factory, bitcoind):
     l1.daemon.wait_for_log(' to ONCHAIN')
     l2.daemon.wait_for_log(' to ONCHAIN')
 
-    bitcoind.generate_block(100)
+    count = bitcoind.rpc.getblockchaininfo()['blocks']
+    bitcoind.generate_block(101)
+    start_time = time.time()
+    # 120 sec timeout
+    local_timeout = 120
+    while (bitcoind.rpc.getblockchaininfo()['blocks'] < (100 + count)) and time.time() < start_time + local_timeout:
+        bitcoind.generate_block(1)
+
+    assert not (bitcoind.rpc.getblockchaininfo()['blocks'] < (100 + count))
+
     wait_for(lambda: l1.rpc.listpeers()['peers'] == [])
     wait_for(lambda: l2.rpc.listpeers()['peers'] == [])
 
@@ -566,7 +576,7 @@ def test_funding_change(node_factory, bitcoind):
     """
     l1, l2 = node_factory.line_graph(2, fundchannel=False)
     l1.fundwallet(10000000)
-    bitcoind.generate_block(1)
+    bitcoind.generate_block(10)
     sync_blockheight(bitcoind, [l1])
 
     outputs = l1.db_query('SELECT value FROM outputs WHERE status=0;')
@@ -587,7 +597,7 @@ def test_funding_all(node_factory, bitcoind):
     l1, l2 = node_factory.line_graph(2, fundchannel=False)
 
     l1.fundwallet(0.1 * 10**8)
-    bitcoind.generate_block(1)
+    bitcoind.generate_block(10)
     sync_blockheight(bitcoind, [l1])
 
     outputs = l1.db_query('SELECT value FROM outputs WHERE status=0;')
@@ -606,15 +616,15 @@ def test_funding_all_too_much(node_factory):
 
     l1.fundwallet(2**24 + 10000)
     l1.rpc.fundchannel(l2.info['id'], "all")
-
+    l1.bitcoin.rpc.generate(10)
     assert only_one(l1.rpc.listfunds()['outputs'])['status'] == 'unconfirmed'
     assert only_one(l1.rpc.listfunds()['channels'])['channel_total_sat'] == 2**24 - 1
 
 
 def test_funding_fail(node_factory, bitcoind):
     """Add some funds, fund a channel without enough funds"""
-    # Previous runs with same bitcoind can leave funds!
-    max_locktime = 5 * 6 * 24
+    # Previous runs with same groestlcoind can leave funds!
+    max_locktime = 5 * 60 * 24
     l1 = node_factory.get_node(random_hsm=True, options={'max-locktime-blocks': max_locktime})
     l2 = node_factory.get_node(options={'watchtime-blocks': max_locktime + 1})
     l1.rpc.connect(l2.info['id'], 'localhost', l2.port)
@@ -623,7 +633,7 @@ def test_funding_fail(node_factory, bitcoind):
 
     addr = l1.rpc.newaddr()['address']
     l1.bitcoin.rpc.sendtoaddress(addr, funds / 10**8)
-    bitcoind.generate_block(1)
+    l1.bitcoin.rpc.generate(10)
 
     # Wait for it to arrive.
     wait_for(lambda: len(l1.rpc.listfunds()['outputs']) > 0)
@@ -662,7 +672,7 @@ def test_funding_toolarge(node_factory, bitcoind):
     # Send funds.
     amount = 2**24
     bitcoind.rpc.sendtoaddress(l1.rpc.newaddr()['address'], amount / 10**8 + 0.01)
-    bitcoind.generate_block(1)
+    bitcoind.generate_block(10)
 
     # Wait for it to arrive.
     wait_for(lambda: len(l1.rpc.listfunds()['outputs']) > 0)
@@ -882,7 +892,7 @@ def test_fee_limits(node_factory):
     l1.daemon.wait_for_log('Peer permanent failure in CHANNELD_NORMAL: lightning_channeld: received ERROR channel .*: update_fee 253 outside range 1875-75000')
     # Make sure the resolution of this one doesn't interfere with the next!
     # Note: may succeed, may fail with insufficient fee, depending on how
-    # bitcoind feels!
+    # groestlcoind feels!
     l1.daemon.wait_for_log('sendrawtx exit')
 
     # Restore to normal.
@@ -958,7 +968,7 @@ def test_update_fee_reconnect(node_factory, bitcoind):
     l2.daemon.wait_for_log('onchaind complete, forgetting peer')
 
 
-@unittest.skipIf(not DEVELOPER, "Too slow without --dev-bitcoind-poll")
+@unittest.skipIf(not DEVELOPER, "Too slow without --dev-groestlcoind-poll")
 def test_multiple_channels(node_factory):
     l1 = node_factory.get_node()
     l2 = node_factory.get_node()
@@ -1021,7 +1031,7 @@ def test_peerinfo(node_factory, bitcoind):
     # Fund a channel to force a node announcement
     chan = l1.fund_channel(l2, 10**6)
     # Now proceed to funding-depth and do a full gossip round
-    bitcoind.generate_block(5)
+    bitcoind.generate_block(6)
     l1.daemon.wait_for_logs(['Received node_announcement for node ' + l2.info['id']])
     l2.daemon.wait_for_logs(['Received node_announcement for node ' + l1.info['id']])
 
@@ -1038,6 +1048,7 @@ def test_peerinfo(node_factory, bitcoind):
 
     # If it reconnects after db load, it should know features.
     l1.restart()
+    bitcoind.generate_block(1)
     wait_for(lambda: l1.rpc.getpeer(l2.info['id'])['connected'])
     wait_for(lambda: l2.rpc.getpeer(l1.info['id'])['connected'])
     assert l1.rpc.getpeer(l2.info['id'])['localfeatures'] == lfeatures
@@ -1050,7 +1061,20 @@ def test_peerinfo(node_factory, bitcoind):
     wait_for(lambda: not only_one(l1.rpc.listpeers(l2.info['id'])['peers'])['connected'])
     wait_for(lambda: not only_one(l2.rpc.listpeers(l1.info['id'])['peers'])['connected'])
 
-    bitcoind.generate_block(100)
+    l1.daemon.wait_for_log('Forgetting peer')
+
+    count = bitcoind.rpc.getblockchaininfo()['blocks']
+    #BOLT5 after 100 blocks in longest chain irrevocably resolved
+    bitcoind.generate_block(101)
+    start_time = time.time()
+    # 120 sec timeout
+    local_timeout = 120
+    while (bitcoind.rpc.getblockchaininfo()['blocks'] < 100 + count) and time.time() < start_time + local_timeout:
+        bitcoind.generate_block(1)
+
+    assert not (bitcoind.rpc.getblockchaininfo()['blocks'] < (100 + count))
+
+
     l1.daemon.wait_for_log('WIRE_ONCHAIN_ALL_IRREVOCABLY_RESOLVED')
     l2.daemon.wait_for_log('WIRE_ONCHAIN_ALL_IRREVOCABLY_RESOLVED')
 

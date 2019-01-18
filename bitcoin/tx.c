@@ -503,7 +503,7 @@ fail:
 	return NULL;
 }
 
-/* <sigh>.  Bitcoind represents hashes as little-endian for RPC. */
+/* <sigh>.  Groestlcoind represents hashes as little-endian for RPC. */
 static void reverse_bytes(u8 *arr, size_t len)
 {
 	unsigned int i;

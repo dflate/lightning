@@ -95,8 +95,8 @@ This release named by practicalswift.
 - JSON API: `invoice` now adds route hint to invoices for incoming capacity (RouteBoost), and warns if insufficient capacity.
 - JSON API: `listforwards` lists all forwarded payments, their associated channels, and fees.
 - JSON API: `getinfo` shows forwarding fees earnt as `msatoshi_fees_collected`.
-- Bitcoind: more parallelism in requests, for very slow nodes.
-- Testing: fixed logging, cleaner interception of bitcoind, minor fixes.
+- Groestlcoind: more parallelism in requests, for very slow nodes.
+- Testing: fixed logging, cleaner interception of groestlcoind, minor fixes.
 - Protocol: we set and handle the new `htlc_maximum_msat` channel_update field.
 
 ### Changed
@@ -183,7 +183,7 @@ This release named by ZmnSCPxj.
   the one given or the first one announced.
 - Crash logs are now placed one-per file like `crash.log.20180822233752`
 - We will no longer allow withdrawing funds or funding channels if we
-  do not have a fee estimate (eg. bitcoind not synced); use new `feerate` arg.
+  do not have a fee estimate (eg. groestlcoind not synced); use new `feerate` arg.
 
 ### Deprecated
 

@@ -24,7 +24,7 @@ struct bitcoin_address;
  * 58^51 < 2^302, but 58^52 > 2^302.  So 52 digits, plus one terminator. */
 #define BASE58_KEY_MAX_LEN 53
 
-/* Bitcoin address encoded in base58, with version and checksum */
+/* Groestlcoin address encoded in base58, with version and checksum */
 char *bitcoin_to_base58(const tal_t *ctx, bool test_net,
 			const struct bitcoin_address *addr);
 bool bitcoin_from_base58(bool *test_net,
@@ -45,5 +45,14 @@ bool key_from_base58(const char *base58, size_t base58_len,
 		     bool *test_net, struct privkey *priv, struct pubkey *key);
 
 void base58_get_checksum(u8 csum[4], const u8 buf[], size_t buflen);
+
+extern bool (*b58_sha256_impl)(void *, const void *, size_t);
+
+extern bool b58tobin(void *bin, size_t *binsz, const char *b58, size_t b58sz);
+extern int b58check(const void *bin, size_t binsz, const char *b58, size_t b58sz);
+
+extern bool b58enc(char *b58, size_t *b58sz, const void *bin, size_t binsz);
+extern bool b58check_enc(char *b58c, size_t *b58c_sz, uint8_t ver, const void *data, size_t datasz);
+
 
 #endif /* LIGHTNING_BITCOIN_BASE58_H */

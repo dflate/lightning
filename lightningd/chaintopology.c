@@ -150,7 +150,7 @@ static void broadcast_remainder(struct bitcoind *bitcoind,
 			   broadcast_remainder, txs);
 }
 
-/* FIXME: This is dumb.  We can group txs and avoid bothering bitcoind
+/* FIXME: This is dumb.  We can group txs and avoid bothering groestlcoind
  * if any one tx is in the main chain. */
 static void rebroadcast_txs(struct chain_topology *topo, struct command *cmd)
 {
@@ -504,7 +504,7 @@ static struct command_result *json_feerates(struct command *cmd,
 
 	if (missing)
 		json_add_string(response, "warning",
-				"Some fee estimates unavailable: bitcoind startup?");
+				"Some fee estimates unavailable: groestlcoind startup?");
 	else {
 		json_object_start(response, "onchain_fee_estimates");
 		/* eg 020000000001016f51de645a47baa49a636b8ec974c28bdff0ac9151c0f4eda2dbe3b41dbe711d000000001716001401fad90abcd66697e2592164722de4a95ebee165ffffffff0240420f00000000002200205b8cd3b914cf67cdd8fa6273c930353dd36476734fbd962102c2df53b90880cdb73f890000000000160014c2ccab171c2a5be9dab52ec41b825863024c54660248304502210088f65e054dbc2d8f679de3e40150069854863efa4a45103b2bb63d060322f94702200d3ae8923924a458cffb0b7360179790830027bb6b29715ba03e12fc22365de1012103d745445c9362665f22e0d96e9e766f273f3260dea39c8a76bfa05dd2684ddccf00000000 == weight 702 */
@@ -618,6 +618,7 @@ static void add_tip(struct chain_topology *topo, struct block *b)
 	topo->max_blockheight = b->height;
 }
 
+
 static struct block *new_block(struct chain_topology *topo,
 			       struct bitcoin_block *blk,
 			       unsigned int height)
@@ -625,6 +626,7 @@ static struct block *new_block(struct chain_topology *topo,
 	struct block *b = tal(topo, struct block);
 
 	sha256_double(&b->blkid.shad, &blk->hdr, sizeof(blk->hdr));
+
 	log_debug(topo->log, "Adding block %u: %s",
 		  height,
 		  type_to_string(tmpctx, struct bitcoin_blkid, &b->blkid));
@@ -642,19 +644,22 @@ static struct block *new_block(struct chain_topology *topo,
 	return b;
 }
 
+
+
 static void remove_tip(struct chain_topology *topo)
 {
-	struct block *b = topo->tip;
+
 	struct bitcoin_txid *txs;
 	size_t i, n;
+	struct block *b;
 
+	b = topo->tip;
 	/* Move tip back one. */
 	topo->tip = b->prev;
-	if (!topo->tip)
+	if (!(topo->tip))
 		fatal("Initial block %u (%s) reorganized out!",
 		      b->height,
 		      type_to_string(tmpctx, struct bitcoin_blkid, &b->blkid));
-
 	txs = wallet_transactions_by_height(b, topo->ld->wallet, b->height);
 	n = tal_count(txs);
 
@@ -692,6 +697,7 @@ static void get_new_block(struct bitcoind *bitcoind,
 		updates_complete(topo);
 		return;
 	}
+
 	bitcoind_getrawblock(bitcoind, blkid, have_new_block, topo);
 }
 
@@ -726,9 +732,9 @@ static void get_init_block(struct bitcoind *bitcoind,
 static void get_init_blockhash(struct bitcoind *bitcoind, u32 blockcount,
 			       struct chain_topology *topo)
 {
-	/* If bitcoind's current blockheight is below the requested height, just
+	/* If groestlcoind's current blockheight is below the requested height, just
 	 * go back to that height. This might be a new node catching up, or
-	 * bitcoind is processing a reorg. */
+	 * groestlcoind is processing a reorg. */
 	if (blockcount < topo->max_blockheight) {
 		if (topo->max_blockheight == UINT32_MAX) {
 			/* Relative rescan, but we didn't know the blockheight */
@@ -739,7 +745,7 @@ static void get_init_blockhash(struct bitcoind *bitcoind, u32 blockcount,
 			else
 				topo->max_blockheight = blockcount - bitcoind->ld->config.rescan;
 		} else {
-			/* Absolute blockheight, but bitcoind's blockheight isn't there yet */
+			/* Absolute blockheight, but groestlcoind's blockheight isn't there yet */
 			/* Protect against underflow in subtraction.
 			 * Possible in regtest mode. */
 			if (blockcount < 1)
@@ -874,7 +880,7 @@ void setup_topology(struct chain_topology *topo,
 	topo->min_blockheight = min_blockheight;
 	topo->max_blockheight = max_blockheight;
 
-	/* Make sure bitcoind is started, and ready */
+	/* Make sure groestlcoind is started, and ready */
 	wait_for_bitcoind(topo->bitcoind);
 
 	bitcoind_getblockcount(topo->bitcoind, get_init_blockhash, topo);

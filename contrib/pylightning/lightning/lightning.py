@@ -444,7 +444,7 @@ class LightningRpc(UnixDomainSocketRpc):
     def withdraw(self, destination, satoshi, feerate=None):
         """
         Send to {destination} address {satoshi} (or "all")
-        amount via Bitcoin transaction
+        amount via Groestlcoin transaction
         """
         payload = {
             "destination": destination,
@@ -471,7 +471,7 @@ class LightningRpc(UnixDomainSocketRpc):
 
     def dev_rescan_outputs(self):
         """
-        Synchronize the state of our funds with bitcoind
+        Synchronize the state of our funds with groestlcoind
         """
         return self.call("dev-rescan-outputs")
 

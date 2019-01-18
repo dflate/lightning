@@ -32,11 +32,11 @@ struct bitcoin_block {
 struct bitcoin_block *bitcoin_block_from_hex(const tal_t *ctx,
 					     const char *hex, size_t hexlen);
 
-/* Parse hex string to get blockid (reversed, a-la bitcoind). */
+/* Parse hex string to get blockid (reversed, a-la groestlcoind). */
 bool bitcoin_blkid_from_hex(const char *hexstr, size_t hexstr_len,
 			    struct bitcoin_blkid *blockid);
 
-/* Get hex string of blockid (reversed, a-la bitcoind). */
+/* Get hex string of blockid (reversed, a-la groestlcoind). */
 bool bitcoin_blkid_to_hex(const struct bitcoin_blkid *blockid,
 			  char *hexstr, size_t hexstr_len);
 #endif /* LIGHTNING_BITCOIN_BLOCK_H */

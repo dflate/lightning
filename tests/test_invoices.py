@@ -17,7 +17,7 @@ def test_invoice(node_factory):
     inv = l1.rpc.invoice(123000, 'label', 'description', '3700', [addr1, addr2])
     after = int(time.time())
     b11 = l1.rpc.decodepay(inv['bolt11'])
-    assert b11['currency'] == 'bcrt'
+    assert b11['currency'] == 'grsrt'
     assert b11['created_at'] >= before
     assert b11['created_at'] <= after
     assert b11['payment_hash'] == inv['payment_hash']
@@ -40,13 +40,13 @@ def test_invoice(node_factory):
     # Check any-amount invoice
     inv = l1.rpc.invoice("any", 'label2', 'description2')
     b11 = inv['bolt11']
-    # Amount usually comes after currency (bcrt in our case),
+    # Amount usually comes after currency (grsrt in our case),
     # but an any-amount invoices will have no amount
-    assert b11.startswith("lnbcrt1")
+    assert b11.startswith("lngrsrt1")
     # By bech32 rules, the last '1' digit is the separator
     # between the human-readable and data parts. We want
-    # to match the "lnbcrt1" above with the '1' digit as the
-    # separator, and not for example "lnbcrt1m1....".
+    # to match the "lngrsrt1" above with the '1' digit as the
+    # separator, and not for example "lngrsrt1m1....".
     assert b11.count('1') == 1
     # There's no incoming channel, so no routeboost
     assert 'routes' not in b11
@@ -292,7 +292,7 @@ def test_invoice_expiry(node_factory, executor):
     assert len(l2.rpc.listinvoices()['invoices']) == 0
 
 
-@unittest.skipIf(not DEVELOPER, "Too slow without --dev-bitcoind-poll")
+@unittest.skipIf(not DEVELOPER, "Too slow without --dev-groestlcoind-poll")
 def test_waitinvoice(node_factory, executor):
     """Test waiting for one invoice will not return if another invoice is paid.
     """
@@ -328,7 +328,7 @@ def test_waitinvoice(node_factory, executor):
     assert not f3.done()
 
 
-@unittest.skipIf(not DEVELOPER, "Too slow without --dev-bitcoind-poll")
+@unittest.skipIf(not DEVELOPER, "Too slow without --dev-groestlcoind-poll")
 def test_waitanyinvoice(node_factory, executor):
     """Test various variants of waiting for the next invoice to complete.
     """

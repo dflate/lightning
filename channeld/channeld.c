@@ -337,7 +337,7 @@ static void send_announcement_signatures(struct peer *peer)
 		 * unique, unlike the channel update which may have
 		 * been replaced in the meantime. */
 		status_failed(STATUS_FAIL_HSM_IO,
-			      "HSM returned an invalid bitcoin signature");
+			      "HSM returned an invalid groestlcoin signature");
 	}
 
 	msg = towire_announcement_signatures(
@@ -611,7 +611,7 @@ static void handle_peer_feechange(struct peer *peer, const u8 *msg)
 	 *
 	 * A receiving node:
 	 *...
-	 *  - if the sender is not responsible for paying the Bitcoin fee:
+	 *  - if the sender is not responsible for paying the Groestlcoin fee:
 	 *    - MUST fail the channel.
 	 */
 	if (peer->channel->funder != REMOTE)
@@ -2440,7 +2440,7 @@ static void handle_feerates(struct peer *peer, const u8 *inmsg)
 
 	/* BOLT #2:
 	 *
-	 * The node _responsible_ for paying the Bitcoin fee:
+	 * The node _responsible_ for paying the Groestlcoin fee:
 	 *   - SHOULD send `update_fee` to ensure the current fee rate is
 	 *    sufficient (by a significant margin) for timely processing of the
 	 *     commitment transaction.
@@ -2451,7 +2451,7 @@ static void handle_feerates(struct peer *peer, const u8 *inmsg)
 	} else {
 		/* BOLT #2:
 		 *
-		 * The node _not responsible_ for paying the Bitcoin fee:
+		 * The node _not responsible_ for paying the Groestlcoin fee:
 		 *  - MUST NOT send `update_fee`.
 		 */
 		/* FIXME: We could drop to chain if fees are too low, but

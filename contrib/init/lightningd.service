@@ -9,17 +9,17 @@
 
 [Unit]
 Description=C-Lightning daemon
-Requires=bitcoind.service
-After=bitcoind.service
+Requires=groestlcoind.service
+After=groestlcoind.service
 
 [Service]
 ExecStart=/usr/bin/lightningd --daemon --conf /etc/lightningd/lightningd.conf --pid-file=/run/lightningd/lightningd.pid
 
-# Creates /run/lightningd owned by bitcoin
+# Creates /run/lightningd owned by groestlcoin
 RuntimeDirectory=lightningd
 
-User=bitcoin
-Group=bitcoin
+User=groestlcoin
+Group=groestlcoin
 Type=forking
 PIDFile=/run/lightningd/lightningd.pid
 Restart=on-failure

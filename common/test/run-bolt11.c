@@ -72,7 +72,6 @@ static void test_b11(const char *b11str,
 	struct bolt11 *b11;
 	char *fail;
 	char *reproduce;
-
 	b11 = bolt11_decode(tmpctx, b11str, hashed_desc, &fail);
 	if (!b11)
 		errx(1, "%s:%u:%s", __FILE__, __LINE__, fail);
@@ -141,7 +140,7 @@ int main(void)
 	/* BOLT #11:
 	 *
 	 * > ### Please make a donation of any amount using payment_hash 0001020304050607080900010203040506070809000102030405060708090102 to me @03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad
-	 * > lnbc1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdpl2pkx2ctnv5sxxmmwwd5kgetjypeh2ursdae8g6twvus8g6rfwvs8qun0dfjkxaq8rkx3yf5tcsyz3d73gafnh3cax9rn449d9p5uxz9ezhhypd0elx87sjle52x86fux2ypatgddc6k63n7erqz25le42c4u4ecky03ylcqca784w
+	 * > lngrs1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdpl2pkx2ctnv5sxxmmwwd5kgetjypeh2ursdae8g6twvus8g6rfwvs8qun0dfjkxaq8rkx3yf5tcsyz3d73gafnh3cax9rn449d9p5uxz9ezhhypd0elx87sjle52x86fux2ypatgddc6k63n7erqz25le42c4u4ecky03ylcqca784w
 	 */
 	if (!pubkey_from_hexstr("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad", strlen("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad"), &node))
 		abort();
@@ -150,7 +149,7 @@ int main(void)
 	 *
 	 * Breakdown:
 	 *
-	 * * `lnbc`: prefix, Lightning on Bitcoin mainnet
+	 * * `lngrs`: prefix, lightning on groestlcoin mainnet
 	 * * `1`: Bech32 separator
 	 * * `pvjluez`: timestamp (1496314658)
 	 * * `p`: payment hash
@@ -163,7 +162,7 @@ int main(void)
 	 * * `ca784w`: Bech32 checksum
 	 */
 	b11 = new_bolt11(tmpctx, NULL);
-	b11->chain = chainparams_for_network("bitcoin");
+	b11->chain = chainparams_for_network("groestlcoin");
 	b11->timestamp = 1496314658;
 	if (!hex_decode("0001020304050607080900010203040506070809000102030405060708090102",
 			strlen("0001020304050607080900010203040506070809000102030405060708090102"),
@@ -172,16 +171,16 @@ int main(void)
 	b11->receiver_id = node;
 	b11->description = "Please consider supporting this project";
 
-	test_b11("lnbc1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdpl2pkx2ctnv5sxxmmwwd5kgetjypeh2ursdae8g6twvus8g6rfwvs8qun0dfjkxaq8rkx3yf5tcsyz3d73gafnh3cax9rn449d9p5uxz9ezhhypd0elx87sjle52x86fux2ypatgddc6k63n7erqz25le42c4u4ecky03ylcqca784w", b11, NULL);
+	test_b11("lngrs1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdpl2pkx2ctnv5sxxmmwwd5kgetjypeh2ursdae8g6twvus8g6rfwvs8qun0dfjkxaqry7cu947rc3snaedmjtmauuslg0glcq6w7t9njkwxpql8zataj6jkcj02tcrskffaahc7570mjv50gt0nku23r8e30gazgndd50cucgplz6udt", b11, NULL);
 
 	/* BOLT #11:
 	 *
 	 * > ### Please send $3 for a cup of coffee to the same peer, within one minute
-	 * > lnbc2500u1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdq5xysxxatsyp3k7enxv4jsxqzpuaztrnwngzn3kdzw5hydlzf03qdgm2hdq27cqv3agm2awhz5se903vruatfhq77w3ls4evs3ch9zw97j25emudupq63nyw24cg27h2rspfj9srp
+	 * > lngrs2500u1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdq5xysxxatsyp3k7enxv4jsxqzpuaztrnwngzn3kdzw5hydlzf03qdgm2hdq27cqv3agm2awhz5se903vruatfhq77w3ls4evs3ch9zw97j25emudupq63nyw24cg27h2rspfj9srp
 	 *
 	 * Breakdown:
 	 *
-	 * * `lnbc`: prefix, Lightning on Bitcoin mainnet
+	 * * `lngrs`: prefix, lightning on groestlcoin mainnet
 	 * * `2500u`: amount (2500 micro-bitcoin)
 	 * * `1`: Bech32 separator
 	 * * `pvjluez`: timestamp (1496314658)
@@ -197,7 +196,7 @@ int main(void)
 	 */
 	msatoshi = 2500 * (1000ULL * 100000000) / 1000000;
 	b11 = new_bolt11(tmpctx, &msatoshi);
-	b11->chain = chainparams_for_network("bitcoin");
+	b11->chain = chainparams_for_network("groestlcoin");
 	b11->timestamp = 1496314658;
 	if (!hex_decode("0001020304050607080900010203040506070809000102030405060708090102",
 			strlen("0001020304050607080900010203040506070809000102030405060708090102"),
@@ -207,16 +206,16 @@ int main(void)
 	b11->description = "1 cup coffee";
 	b11->expiry = 60;
 
-	test_b11("lnbc2500u1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdq5xysxxatsyp3k7enxv4jsxqzpuaztrnwngzn3kdzw5hydlzf03qdgm2hdq27cqv3agm2awhz5se903vruatfhq77w3ls4evs3ch9zw97j25emudupq63nyw24cg27h2rspfj9srp", b11, NULL);
+	test_b11("lngrs2500u1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdq5xysxxatsyp3k7enxv4jsxqzpu9qesh2z5s6s0vjmq05mva9wp7l2pynjm2x3wf8zcj4kfa040wqzprsmyrdeuc8l7eemqt56r3srwvjetej72xdhnr4r74nellv7hlkgqqscvgy", b11, NULL);
 
 	/* BOLT #11:
 	 *
 	 * > ### Now send $24 for an entire list of things (hashed)
-	 * > lnbc20m1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqhp58yjmdan79s6qqdhdzgynm4zwqd5d7xmw5fk98klysy043l2ahrqscc6gd6ql3jrc5yzme8v4ntcewwz5cnw92tz0pc8qcuufvq7khhr8wpald05e92xw006sq94mg8v2ndf4sefvf9sygkshp5zfem29trqq2yxxz7
+	 * > lngrs20m1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqhp58yjmdan79s6qqdhdzgynm4zwqd5d7xmw5fk98klysy043l2ahrqscc6gd6ql3jrc5yzme8v4ntcewwz5cnw92tz0pc8qcuufvq7khhr8wpald05e92xw006sq94mg8v2ndf4sefvf9sygkshp5zfem29trqq2yxxz7
 	 *
 	 * Breakdown:
 	 *
-	 * * `lnbc`: prefix, Lightning on Bitcoin mainnet
+	 * * `lngrs`: prefix, lightning on groestlcoin mainnet
 	 * * `20m`: amount (20 milli-bitcoin)
 	 * * `1`: Bech32 separator
 	 * * `pvjluez`: timestamp (1496314658)
@@ -229,7 +228,7 @@ int main(void)
 	 */
 	msatoshi = 20 * (1000ULL * 100000000) / 1000;
 	b11 = new_bolt11(tmpctx, &msatoshi);
-	b11->chain = chainparams_for_network("bitcoin");
+	b11->chain = chainparams_for_network("groestlcoin");
 	b11->timestamp = 1496314658;
 	if (!hex_decode("0001020304050607080900010203040506070809000102030405060708090102",
 			strlen("0001020304050607080900010203040506070809000102030405060708090102"),
@@ -237,10 +236,13 @@ int main(void)
 		abort();
 	b11->receiver_id = node;
 	b11->description_hash = tal(b11, struct sha256);
-	test_b11("lnbc20m1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqhp58yjmdan79s6qqdhdzgynm4zwqd5d7xmw5fk98klysy043l2ahrqscc6gd6ql3jrc5yzme8v4ntcewwz5cnw92tz0pc8qcuufvq7khhr8wpald05e92xw006sq94mg8v2ndf4sefvf9sygkshp5zfem29trqq2yxxz7", b11, "One piece of chocolate cake, one icecream cone, one pickle, one slice of swiss cheese, one slice of salami, one lollypop, one piece of cherry pie, one sausage, one cupcake, and one slice of watermelon");
+
+	//sha256(b11->description_hash, "One piece of chocolate cake, one icecream cone, one pickle, one slice of swiss cheese, one slice of salami, one lollypop, one piece of cherry pie, one sausage, one cupcake, and one slice of watermelon", strlen("One piece of chocolate cake, one icecream cone, one pickle, one slice of swiss cheese, one slice of salami, one lollypop, one piece of cherry pie, one sausage, one cupcake, and one slice of watermelon"));
+
+	test_b11("lngrs20m1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqhp58yjmdan79s6qqdhdzgynm4zwqd5d7xmw5fk98klysy043l2ahrqsey8q96sq3fth032rsqpl8vedajcpxapcfgpv2m3sj8xgpdpv8vy38dv68hsj2dhfwpyh2g5a9ppmyv05df4sv8p4dtftpegp94dr4gqp6ek8hs", b11, "One piece of chocolate cake, one icecream cone, one pickle, one slice of swiss cheese, one slice of salami, one lollypop, one piece of cherry pie, one sausage, one cupcake, and one slice of watermelon");
 
 	/* Malformed bolt11 strings (no '1'). */
-	badstr = "lnbc20mpvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqhp58yjmdan79s6qqdhdzgynm4zwqd5d7xmw5fk98klysy043l2ahrqscc6gd6ql3jrc5yzme8v4ntcewwz5cnw92tz0pc8qcuufvq7khhr8wpald05e92xw006sq94mg8v2ndf4sefvf9sygkshp5zfem29trqq2yxxz7";
+	badstr = "lngrs20m1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqhp58yjmdan79s6qqdhdzgynm4zwqd5d7xmw5fk98klysy043l2ahrqsey8q96sq3fth032rsqpl8vedajcpxapcfgpv2m3sj8xgpdpv8vy38dv68hsj2dhfwpyh2g5a9ppmyv05df4sv8p4dtftpegp94dr4gqp6ek8hs";
 
 	for (size_t i = 0; i <= strlen(badstr); i++) {
 		char *fail;
@@ -254,7 +256,7 @@ int main(void)
 	/* ALL UPPERCASE is allowed (useful for QR codes) */
 	msatoshi = 2500 * (1000ULL * 100000000) / 1000000;
 	b11 = new_bolt11(tmpctx, &msatoshi);
-	b11->chain = chainparams_for_network("bitcoin");
+	b11->chain = chainparams_for_network("groestlcoin");
 	b11->timestamp = 1496314658;
 	if (!hex_decode("0001020304050607080900010203040506070809000102030405060708090102",
 			strlen("0001020304050607080900010203040506070809000102030405060708090102"),
@@ -264,7 +266,7 @@ int main(void)
 	b11->description = "1 cup coffee";
 	b11->expiry = 60;
 
-	test_b11("LNBC2500U1PVJLUEZPP5QQQSYQCYQ5RQWZQFQQQSYQCYQ5RQWZQFQQQSYQCYQ5RQWZQFQYPQDQ5XYSXXATSYP3K7ENXV4JSXQZPUAZTRNWNGZN3KDZW5HYDLZF03QDGM2HDQ27CQV3AGM2AWHZ5SE903VRUATFHQ77W3LS4EVS3CH9ZW97J25EMUDUPQ63NYW24CG27H2RSPFJ9SRP", b11, NULL);
+	test_b11("LNGRS2500U1PVJLUEZPP5QQQSYQCYQ5RQWZQFQQQSYQCYQ5RQWZQFQQQSYQCYQ5RQWZQFQYPQDQ5XYSXXATSYP3K7ENXV4JSXQZPUAZTRNWNGZN3KDZW5HYDLZF03QDGM2HDQ27CQV3AGM2AWHZ5SE903VRUATFHQ77W3LS4EVS3CH9ZW97J25EMUDUPQ63NYW24CG27H2RSPFJ9SRP", b11, NULL);
 	/* FIXME: Test the others! */
 	wally_cleanup(0);
 	tal_free(tmpctx);
